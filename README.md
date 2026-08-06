@@ -90,15 +90,58 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 
 ## 🗺️ Roadmap
 
-- [ ] Reminder Email
-- [ ] Dashboard Web
-- [ ] Perhitungan Progress
-- [ ] Integrasi WhatsApp
-- [ ] Security Baseline Control (POL.ISMS.001)
-- [ ] Dashboard Analitik
-- [ ] Multi Project
-- [ ] Export PDF
-- [ ] Riwayat Notifikasi
+Pengembangan fitur dilakukan berdasarkan **Mekanisme AI Workflow** (*Analyze ➔ Design ➔ Implement ➔ Review ➔ Test ➔ Document*).
+
+### Tahap 1: Fondasi & Keamanan
+- **Security Baseline Control (POL.ISMS.001)**
+  - [x] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [x] Document
+- **Perhitungan Progress**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+
+### Tahap 2: Antarmuka & Notifikasi Dasar
+- **Dashboard Web**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+- **Reminder Email**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+
+### Tahap 3: Integrasi Lanjutan & Skalabilitas
+- **Integrasi WhatsApp**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+- **Dashboard Analitik**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+- **Multi Project**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+- **Export PDF**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
+- **Riwayat Notifikasi**
+  - [ ] Analyze & Design
+  - [ ] Implement
+  - [ ] Review & Test
+  - [ ] Document
 
 ---
 
