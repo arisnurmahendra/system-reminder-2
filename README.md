@@ -1,3 +1,7 @@
+![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?logo=google&logoColor=white)
+![Status](https://img.shields.io/badge/status-active-success)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 # System Reminder 2
 > Peningkatan dari *System Reminder — Automated Project To-Do Email* (versi 2022)  
 > Sistem pemantauan kemajuan proyek & pengingat otomatis berbasis Web menggunakan Google Apps Script.
@@ -8,6 +12,17 @@
 Proyek ini adalah penyempurnaan dari sistem yang pertama kali dikembangkan pada tahun 2022. Jika versi awal hanya berfokus pada pengiriman pengingat tugas lewat email, **System Reminder 2** hadir dengan kemampuan memantau kemajuan proyek secara keseluruhan—mirip fungsi Gantt Chart dan Kurva S—serta menambahkan saluran notifikasi WhatsApp.
 
 Dibangun sepenuhnya menggunakan ekosistem Google Workspace, tanpa memerlukan server tambahan.
+
+---
+
+## 🎯 Tujuan
+
+System Reminder 2 bertujuan membantu tim proyek dalam:
+
+- memantau progres pekerjaan secara harian;
+- mendeteksi keterlambatan sedini mungkin;
+- mengirim pengingat otomatis melalui Email maupun WhatsApp;
+- menyederhanakan administrasi proyek melalui antarmuka web yang mudah digunakan.
 
 ---
 
@@ -45,6 +60,40 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 - 💬 **Notifikasi WhatsApp:** Menggunakan layanan Fonnte untuk pengingat yang lebih cepat
 - 🎛️ **Kontrol Pusat:** Pengaturan aktif/nonaktif notifikasi per proyek
 - 🖥️ **Antarmuka Web:** Pengelolaan mudah lewat halaman internal berbasis HTML di Google Apps Script
+
+---
+
+## 🖼️ Tampilan Aplikasi
+
+> Screenshot akan ditambahkan setelah antarmuka stabil.
+
+| Dashboard | Input Progress | Pengaturan |
+|-----------|----------------|------------|
+| *(Coming Soon)* | *(Coming Soon)* | *(Coming Soon)* |
+
+---
+
+## ⚙️ Instalasi
+
+1. Buat proyek Google Apps Script baru.
+2. Hubungkan dengan Google Spreadsheet.
+3. Salin seluruh berkas proyek.
+4. Atur konfigurasi pada `CONFIG`.
+5. Masukkan Token Fonnte.
+6. Deploy sebagai Web App.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Reminder Email
+- [x] Dashboard Web
+- [x] Perhitungan Progress
+- [x] Integrasi WhatsApp
+- [ ] Dashboard Analitik
+- [ ] Multi Project
+- [ ] Export PDF
+- [ ] Riwayat Notifikasi
 
 ---
 
@@ -102,48 +151,20 @@ System-Reminder-2/
 
 ---
 
-🤖 AI_ROLE.md — Peran AI dalam Proyek
-# AI_ROLE.md
-## Peran Utama
-Kamu adalah mitra pengembang untuk proyek **System Reminder 2**.
-Tugas utamamu:
-- Membantu menyempurnakan kode Google Apps Script
-- Memberikan saran yang sesuai dengan arsitektur yang sudah ditetapkan
-- Menjelaskan konsep dengan sederhana namun akurat
-- Menghindari usulan teknologi di luar stack yang sudah dipilih
+## 📚 Dokumentasi
 
-## Batasan
-- Jangan mengusulkan penggantian layanan Google Workspace dengan layanan lain
-- Jangan mengusulkan penggunaan kerangka kerja web berat (seperti React/Vue) kecuali untuk penyempurnaan tampilan HTML dasar
-- Selalu utamakan kompatibilitas dengan Google Apps Script
+Dokumentasi pengembangan proyek tersedia pada folder `docs/`.
 
-🔄 AI_WORKFLOW.md — Alur Kerja Pengembangan
-# AI_WORKFLOW.md
-## Aturan Kerja
-1. **Kembangkan secara bertahap**: Mulai dari fungsi dasar, lalu integrasi, terakhir tampilan.
-2. **Gunakan ulang kode lama**: Jika ada fungsi dari versi 2022 yang masih relevan, sesuaikan saja—jangan tulis ulang dari nol jika tidak perlu.
-3. **Keamanan diutamakan**: Token API, kunci rahasia, tidak boleh tertulis di kode utama.
-4. **Uji coba bertahap**: Pastikan satu fitur berjalan baik sebelum menambah fitur baru.
-5. **Dokumentasi**: Setiap fungsi baru harus memiliki penjelasan singkat cara kerjanya.
+| Dokumen | Deskripsi |
+|---------|-----------|
+| `AI_ROLE.md` | Peran AI sebagai mitra pengembang proyek |
+| `AI_WORKFLOW.md` | Alur kerja dan aturan pengembangan |
+| `ARCHITECTURE_PRINCIPLES.md` | Prinsip arsitektur yang digunakan |
+| `PROJECT_CONSTRAINTS.md` | Batasan teknologi dan ruang lingkup proyek |
 
-🏗️ ARCHITECTURE_PRINCIPLES.md — Prinsip Arsitektur
-# ARCHITECTURE_PRINCIPLES.md
-## Prinsip Utama System Reminder 2
-- **Berbasis Google Workspace**: Semua data tersimpan di Google Sheets, logika berjalan di Apps Script.
-- **Tanpa Server Tambahan**: Tidak menggunakan hosting eksternal atau database terpisah.
-- **Antarmuka Web Sederhana**: Menggunakan HTML, CSS, dan JS murni yang terintegrasi dengan GAS.
-- **Modular**: Kode dipisah per fungsi (email, wa, hitung, konfigurasi) agar mudah diperbaiki.
-- **Kompatibel**: Melanjutkan sistem lama, bukan menggantinya sepenuhnya.
-- **Kendali Pengguna**: Setiap notifikasi bisa diatur aktif/tidak secara mandiri.
+Dokumen-dokumen tersebut menjadi acuan utama selama proses pengembangan agar implementasi tetap konsisten dengan tujuan proyek.
 
-⚠️ PROJECT_CONSTRAINTS.md — Batasan Proyek
-# PROJECT_CONSTRAINTS.md
-## Batasan Teknologi
-- **Wajib**: Google Apps Script, Google Sheets, Gmail, Fonnte API, HTML/CSS/JS dasar.
-- **Dilarang**: Bahasa pemrograman lain, kerangka aplikasi berat, layanan berbayar baru, penyimpanan data di luar Google.
-- **Keamanan**: Kunci API Fonnte dan data sensitif tidak boleh masuk ke repositori publik.
-- **Ketersediaan**: Sistem harus tetap berjalan meskipun tanpa koneksi internet saat input data nanti disinkronkan ulang.
-- **Kapasitas**: Mengikuti batas kuota pengiriman Gmail dan Fonnte untuk penggunaan wajar.
+---
 
 ## © Lisensi
 Proyek ini dilisensikan di bawah Lisensi MIT - silakan lihat berkas [LICENSE](LICENSE) untuk rinciannya.
