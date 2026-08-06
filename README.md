@@ -59,6 +59,11 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 - 📧 **Notifikasi Email Otomatis:** Terkirim jika terdeteksi keterlambatan (bisa dinyalakan/dimatikan)
 - 💬 **Notifikasi WhatsApp:** Menggunakan layanan Fonnte untuk pengingat yang lebih cepat
 - 🎛️ **Kontrol Pusat:** Pengaturan aktif/nonaktif notifikasi per proyek
+- 🔒 **Keamanan Baseline Control (POL.ISMS.001):**
+  - **Otentikasi & RBAC:** Hak akses bertingkat (`ADMINISTRATOR`, `PROJECT_MANAGER`, `REGULAR_USER`, `AUDITOR`).
+  - **Password & Lockout:** Penggantian password default wajib pada login pertama, aturan password ketat, dan lockout otomatis setelah 10 kali percobaaan gagal.
+  - **Audit Logging:** Pencatatan jejak audit aktivitas secara terstruktur dengan masking otomatis untuk data sensitif.
+  - **MFA:** Integrasi Google 2-Step Verification (2SV) wajib untuk Administrator.
 - 🖥️ **Antarmuka Web:** Pengelolaan mudah lewat halaman internal berbasis HTML di Google Apps Script
 
 ---
@@ -78,18 +83,18 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 1. Buat proyek Google Apps Script baru.
 2. Hubungkan dengan Google Spreadsheet.
 3. Salin seluruh berkas proyek.
-4. Atur konfigurasi pada `CONFIG`.
-5. Masukkan Token Fonnte.
-6. Deploy sebagai Web App.
+4. Atur konfigurasi pada `Script Properties` (seperti `FONNTE_TOKEN`).
+5. Deploy sebagai Web App.
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] Reminder Email
-- [x] Dashboard Web
-- [x] Perhitungan Progress
-- [x] Integrasi WhatsApp
+- [ ] Reminder Email
+- [ ] Dashboard Web
+- [ ] Perhitungan Progress
+- [ ] Integrasi WhatsApp
+- [ ] Security Baseline Control (POL.ISMS.001)
 - [ ] Dashboard Analitik
 - [ ] Multi Project
 - [ ] Export PDF
@@ -105,6 +110,7 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 | Antarmuka | HTML, CSS, JavaScript (terintegrasi GAS) |
 | Pengiriman Email | Gmail |
 | Pengiriman WhatsApp | Fonnte API |
+| Keamanan & Rahasia | Google Apps Script PropertiesService & Utilities Digest |
 | Penyimpanan Berkas | Google Drive |
 
 ---
@@ -114,23 +120,30 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan untuk menjawab keb
 ```text
 System-Reminder-2/
 ├── docs/
-│   ├── AI_ROLE.md                  # Peran AI dalam Proyek
-│   ├── AI_WORKFLOW.md              # Alur Kerja Pengembangan
-│   ├── ARCHITECTURE_PRINCIPLES.md  # Prinsip Arsitektur
-│   └── PROJECT_CONSTRAINTS.md      # Batasan Proyek
+│   ├── AI_ROLE.md                  # Peran AI sebagai mitra pengembang proyek
+│   ├── AI_WORKFLOW.md              # Alur kerja dan aturan pengembangan
+│   ├── ARCHITECTURE_PRINCIPLES.md  # Prinsip arsitektur dan desain sistem
+│   ├── PROJECT_CONSTRAINTS.md      # Batasan teknologi dan ruang lingkup proyek
+│   └── SECURITY_POL_ISMS_001.md    # Standar keamanan Baseline Control (POL.ISMS.001)
 ├── assets/
-│   ├── style.css                   # Tampilan antarmuka
-│   └── script.js                   # Interaksi sisi klien
+│   ├── script.js                   # Interaksi & logika antarmuka sisi klien (frontend)
+│   └── style.css                   # Tampilan & gaya visual antarmuka (CSS)
 ├── modul/
-│   ├── email.gs                    # Fungsi pengiriman email
-│   ├── fonnte.gs                   # Integrasi Fonnte WhatsApp
-│   └── hitung-progres.gs           # Perhitungan kurva & keterlambatan
-├── .gitignore
-├── appsscript.json
-├── Code.gs                         # Logika utama & koneksi web
-├── Index.html                      # Halaman utama aplikasi
-├── LICENSE
-└── README.md
+│   ├── dashboard.gs                # Logika backend pemrosesan data dashboard
+│   ├── email.gs                    # Modul pengiriman notifikasi via Gmail API
+│   ├── fonnte.gs                   # Modul pengiriman notifikasi WhatsApp via Fonnte API
+│   ├── hitung-progres.gs           # Logika kalkulasi progres, Kurva S, & keterlambatan
+│   └── repository.gs               # Abstraksi akses data & operasi Google Sheets
+├── .claspignore                    # Pengaturan file yang diabaikan oleh Clasp CLI
+├── .gitignore                      # Pengaturan file yang diabaikan oleh Git
+├── .prettierignore                 # Pengaturan file yang diabaikan oleh Prettier
+├── .prettierrc                     # Konfigurasi format kode Prettier
+├── Code.gs                         # Entry point utama Web App & routing Google Apps Script
+├── Index.html                      # Halaman utama aplikasi (HTML UI)
+├── gas2git.cmd                     # Skrip otomasi tarik kode dari GAS ke repositori Git
+├── git2gas.cmd                     # Skrip otomasi dorong kode dari Git ke GAS
+├── LICENSE                         # Berkas Lisensi MIT
+└── README.md                       # Dokumentasi utama proyek
 ```
 
 ---
@@ -146,7 +159,7 @@ System-Reminder-2/
 
 ## ⚠️ Catatan Penting
 - Token API Fonnte dan pengaturan rahasia **tidak disertakan** dalam repositori ini demi keamanan
-- Konfigurasi sensitif disimpan secara lokal atau di pengaturan proyek Google Apps Script
+- Konfigurasi sensitif disimpan pada **`PropertiesService`** Google Apps Script
 - Penggunaan kuota pengiriman mengikuti batasan layanan Gmail dan Fonnte
 
 ---
@@ -161,6 +174,7 @@ Dokumentasi pengembangan proyek tersedia pada folder `docs/`.
 | `AI_WORKFLOW.md` | Alur kerja dan aturan pengembangan |
 | `ARCHITECTURE_PRINCIPLES.md` | Prinsip arsitektur yang digunakan |
 | `PROJECT_CONSTRAINTS.md` | Batasan teknologi dan ruang lingkup proyek |
+| `SECURITY_POL_ISMS_001.md` | Standar keamanan Baseline Control & acuan implementasi (POL.ISMS.001) |
 
 Dokumen-dokumen tersebut menjadi acuan utama selama proses pengembangan agar implementasi tetap konsisten dengan tujuan proyek.
 
