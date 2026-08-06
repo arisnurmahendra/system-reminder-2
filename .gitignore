@@ -141,3 +141,17 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+.vscode/*
+.claspignore
+.prettierignore
+.prettierrc
+.clasp.json
+.gasignore
+.gcloudignore
+.gitattributes
+.gitconfig
+.gitignore
+
+git2gas.cmd
+gas2git.cmd
