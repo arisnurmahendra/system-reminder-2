@@ -84,30 +84,6 @@ System-Reminder-2/
 └── README.md
 ```
 
----## 📂 Struktur Berkas
-
-```text
-System-Reminder-2/
-├── docs/
-│   ├── AI_ROLE.md                  # Peran AI dalam Proyek
-│   ├── AI_WORKFLOW.md              # Alur Kerja Pengembangan
-│   ├── ARCHITECTURE_PRINCIPLES.md  # Prinsip Arsitektur
-│   └── PROJECT_CONSTRAINTS.md      # Batasan Proyek
-├── assets/
-│   ├── style.css                   # Tampilan antarmuka
-│   └── script.js                   # Interaksi sisi klien
-├── modul/
-│   ├── email.gs                    # Fungsi pengiriman email
-│   ├── fonnte.gs                   # Integrasi Fonnte WhatsApp
-│   └── hitung-progres.gs           # Perhitungan kurva & keterlambatan
-├── .gitignore
-├── appsscript.json
-├── Code.gs                         # Logika utama & koneksi web
-├── Index.html                      # Halaman utama aplikasi
-├── LICENSE
-└── README.md
-```
-
 ---
 
 ## 🚀 Cara Kerja Singkat
