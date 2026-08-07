@@ -166,6 +166,8 @@ System-Reminder-2/
 │   ├── AI_ROLE.md                  # Peran AI sebagai mitra pengembang proyek
 │   ├── AI_WORKFLOW.md              # Alur kerja dan aturan pengembangan
 │   ├── ARCHITECTURE_PRINCIPLES.md  # Prinsip arsitektur dan desain sistem
+│   ├── DEFINITION_OF_DONE.md       # Kriteria kelayakan penyelesaian tugas (DoD)
+│   ├── DEPENDENCY_RULES.md         # Aturan dan panduan pengelolaan dependensi
 │   ├── PROJECT_CONSTRAINTS.md      # Batasan teknologi dan ruang lingkup proyek
 │   └── SECURITY_POL_ISMS_001.md    # Standar keamanan Baseline Control (POL.ISMS.001)
 ├── assets/
@@ -216,6 +218,8 @@ Dokumentasi pengembangan proyek tersedia pada folder `docs/`.
 | `AI_ROLE.md` | Peran AI sebagai mitra pengembang proyek |
 | `AI_WORKFLOW.md` | Alur kerja dan aturan pengembangan |
 | `ARCHITECTURE_PRINCIPLES.md` | Prinsip arsitektur yang digunakan |
+| `DEFINITION_OF_DONE.md` | Kriteria kelayakan penyelesaian tugas (DoD) |
+| `DEPENDENCY_RULES.md` | Aturan dan panduan pengelolaan dependensi |
 | `PROJECT_CONSTRAINTS.md` | Batasan teknologi dan ruang lingkup proyek |
 | `SECURITY_POL_ISMS_001.md` | Standar keamanan Baseline Control & acuan implementasi (POL.ISMS.001) |
 
