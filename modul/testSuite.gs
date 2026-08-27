@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, & Google Drive Integration
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, & Dashboard Analytics
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -1112,6 +1112,53 @@ function runAllDriveIntegrationTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN GOOGLE DRIVE INTEGRATION: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllAnalyticsTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST DASHBOARD ANALYTICS ===");
+
+  // 1. Test Portfolio Analytics
+  var portRes = AnalyticsService.getPortfolioAnalytics();
+  assert("Portfolio Analytics Succeeded", portRes.success === true && typeof portRes.data === "object", "Portfolio analytics failed");
+
+  var d = portRes.data;
+  assert("Summary Metrics Include Completion Rate", typeof d.summary.completionRate === "number", "Completion rate missing");
+  assert("Status Distribution Defined", typeof d.statusDistribution.ACTIVE === "number", "Status distribution missing");
+  assert("Schedule Health Distribution Defined", typeof d.scheduleHealthDistribution.DELAYED === "number", "Schedule health missing");
+  assert("Progress Quartiles Defined", typeof d.progressQuartiles["0_25"] === "number", "Progress quartiles missing");
+  assert("Monthly Trends Object Defined", typeof d.monthlyTrends === "object", "Monthly trends missing");
+
+  // 2. Test Project Analytics
+  var proj = ProjectRepository.findAll()[0];
+  var projAnalyticsRes = AnalyticsService.getProjectAnalytics(proj.project_id);
+  assert("Single Project Analytics Succeeded", 
+    projAnalyticsRes.success === true && 
+    typeof projAnalyticsRes.data.progressVelocityPerDay === "number" && 
+    Boolean(projAnalyticsRes.data.forecastEndDate),
+    "Single project analytics failed"
+  );
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN DASHBOARD ANALYTICS: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

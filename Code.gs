@@ -227,6 +227,18 @@ function apiSaveProjectPdfToDrive(projectId) {
   }, "apiSaveProjectPdfToDrive");
 }
 
+function apiGetPortfolioAnalytics() {
+  return safeWebResponse(function() {
+    return AnalyticsService.getPortfolioAnalytics();
+  }, "apiGetPortfolioAnalytics");
+}
+
+function apiGetProjectAnalytics(projectId) {
+  return safeWebResponse(function() {
+    return AnalyticsService.getProjectAnalytics(sanitizeString(projectId));
+  }, "apiGetProjectAnalytics");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================
