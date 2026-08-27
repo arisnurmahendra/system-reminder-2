@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, & Export PDF
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, & Google Drive Integration
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -1050,6 +1050,68 @@ function runAllPdfExportTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN EXPORT PDF: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllDriveIntegrationTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST GOOGLE DRIVE INTEGRATION ===");
+
+  // 1. Setup Proyek untuk Pengujian Drive
+  var proj = ProjectService.registerProject({
+    projectName: "Proyek Revitalisasi Stasiun Kota",
+    startDate: "2026-03-01",
+    endDate: "2026-11-30",
+    picName: "Rudi",
+    picEmail: "rudi@perusahaan.com"
+  });
+  var projId = proj.data.projectId;
+
+  // 2. Test Get or Create Folder
+  var fld = GoogleDriveService.getOrCreateFolder("Test_App_Folder");
+  assert("Folder Retrieved or Created with ID and URL", Boolean(fld.folderId) && Boolean(fld.url), "Folder get/create failed");
+
+  // 3. Test Project Folder Creation
+  var projFolder = GoogleDriveService.getProjectFolder(projId);
+  assert("Project Folder Created with Project Name", 
+    Boolean(projFolder.folderId) && projFolder.name.indexOf("Proyek Revitalisasi Stasiun Kota") !== -1, 
+    "Project folder failed"
+  );
+
+  // 4. Test File Upload
+  var uploadRes = GoogleDriveService.uploadFile(projFolder.folderId, "test_doc.txt", "text/plain", "Dokumen uji coba");
+  assert("File Upload Returns File ID and URL", Boolean(uploadRes.fileId) && Boolean(uploadRes.url), "File upload failed");
+
+  // 5. Test Save Project PDF to Drive
+  var savePdfRes = GoogleDriveService.saveProjectPdfToDrive(projId);
+  assert("Save Project PDF to Drive Succeeded", 
+    savePdfRes.success === true && Boolean(savePdfRes.data.fileId) && savePdfRes.data.fileName.indexOf(".pdf") !== -1, 
+    "Save PDF to drive failed"
+  );
+
+  // 6. Test Delete File
+  var delRes = GoogleDriveService.deleteFile(uploadRes.fileId);
+  assert("Delete File Returns Success", delRes === true, "Delete file failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN GOOGLE DRIVE INTEGRATION: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

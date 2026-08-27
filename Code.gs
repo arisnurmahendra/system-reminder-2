@@ -221,6 +221,12 @@ function apiExportPortfolioPdf() {
   }, "apiExportPortfolioPdf");
 }
 
+function apiSaveProjectPdfToDrive(projectId) {
+  return safeWebResponse(function() {
+    return GoogleDriveService.saveProjectPdfToDrive(sanitizeString(projectId));
+  }, "apiSaveProjectPdfToDrive");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================
