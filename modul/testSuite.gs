@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, Dashboard Analytics, & Notification History
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, Dashboard Analytics, Notification History, & Advanced Report
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -1213,6 +1213,69 @@ function runAllNotificationHistoryTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN NOTIFICATION HISTORY: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllAdvancedReportTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST ADVANCED REPORT ===");
+
+  // 1. Test Executive Report
+  var execRep = AdvancedReportService.generateExecutiveReport();
+  assert("Executive Report Generated with Standards Compliance", 
+    execRep.success === true && 
+    execRep.data.standardsCompliance === "POL.ISMS.001" && 
+    typeof execRep.data.executiveSummary === "object", 
+    "Executive report failed"
+  );
+
+  // 2. Test Project Detail Report
+  var proj = ProjectRepository.findAll()[0];
+  var projRep = AdvancedReportService.generateProjectDetailReport(proj.project_id);
+  assert("Project Detail Report Contains Analytics and History", 
+    projRep.success === true && 
+    Array.isArray(projRep.data.progressHistory) && 
+    Boolean(projRep.data.analytics), 
+    "Project detail report failed"
+  );
+
+  // 3. Test Progress Variance Report
+  var varRep = AdvancedReportService.generateProgressVarianceReport();
+  assert("Progress Variance Report Generated with Records", 
+    varRep.success === true && 
+    Array.isArray(varRep.data.records) && 
+    varRep.data.totalEvaluated > 0, 
+    "Variance report failed"
+  );
+
+  // 4. Test Non-Existent Project Rejection
+  var caughtNotFound = false;
+  try {
+    AdvancedReportService.generateProjectDetailReport("prj_tidak_ada_xyz");
+  } catch (e) {
+    caughtNotFound = true;
+  }
+  assert("Non-Existent Project Throws NotFound in Detail Report", caughtNotFound, "Non-existent project passed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN ADVANCED REPORT: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

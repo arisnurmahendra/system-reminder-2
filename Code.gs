@@ -251,6 +251,24 @@ function apiGetNotificationStats() {
   }, "apiGetNotificationStats");
 }
 
+function apiGetAdvancedExecutiveReport(filters) {
+  return safeWebResponse(function() {
+    return AdvancedReportService.generateExecutiveReport(filters);
+  }, "apiGetAdvancedExecutiveReport");
+}
+
+function apiGetAdvancedProjectReport(projectId) {
+  return safeWebResponse(function() {
+    return AdvancedReportService.generateProjectDetailReport(sanitizeString(projectId));
+  }, "apiGetAdvancedProjectReport");
+}
+
+function apiGetProgressVarianceReport(filters) {
+  return safeWebResponse(function() {
+    return AdvancedReportService.generateProgressVarianceReport(filters);
+  }, "apiGetProgressVarianceReport");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================
