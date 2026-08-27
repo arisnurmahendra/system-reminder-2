@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security Baseline Control (POL.ISMS.001)
+ * Unit Test & Verification Suite untuk Security Baseline & Repository Layer
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -109,7 +109,90 @@ function runAllSecurityTests() {
   );
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
-  Logger.log("=== HASIL PENGUJIAN: " + totalPassed + "/" + results.length + " LULUS ===");
+  Logger.log("=== HASIL PENGUJIAN KEAMANAN: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllRepositoryTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST REPOSITORY LAYER ===");
+
+  // 1. Test Base Repository Creation
+  var testHeaders = ["id", "name", "email", "status"];
+  var mockRepo = createBaseRepository("Test_Sheet", testHeaders, "id");
+  assert("Base Repository Created", typeof mockRepo === "object" && mockRepo.primaryKey === "id", "Mock repo creation failed");
+
+  // 2. Test In-memory Cache & Singleton Sheet Access
+  SpreadsheetManager.clearCache();
+  var sheet1 = SpreadsheetManager.getSheet("Test_Sheet", testHeaders);
+  var sheet2 = SpreadsheetManager.getSheet("Test_Sheet", testHeaders);
+  assert("Sheet In-Memory Caching Returns Same Reference", sheet1 === sheet2, "Sheet cache failed");
+
+  // 3. Test Insert & FindById
+  mockRepo.insert({ id: "t1", name: "Alice", email: "alice@test.com", status: "ACTIVE" });
+  var found = mockRepo.findById("t1");
+  assert("Insert and FindById Work", found && found.name === "Alice" && found.email === "alice@test.com", "Insert/FindById failed");
+
+  // 4. Test FindOneByField & FindByField
+  var foundByEmail = mockRepo.findOneByField("email", "alice@test.com");
+  assert("FindOneByField Case-Insensitive Works", foundByEmail && foundByEmail.id === "t1", "FindOneByField failed");
+
+  // 5. Test Batch Insert
+  var batchItems = [
+    { id: "t2", name: "Bob", email: "bob@test.com", status: "ACTIVE" },
+    { id: "t3", name: "Charlie", email: "charlie@test.com", status: "INACTIVE" }
+  ];
+  var insertedCount = mockRepo.insertBatch(batchItems);
+  assert("InsertBatch Returns Correct Count", insertedCount === 2, "InsertBatch count mismatch: " + insertedCount);
+
+  // 6. Test FindAll with Predicate Filter
+  var activeUsers = mockRepo.findAll(function(u) { return u.status === "ACTIVE"; });
+  assert("FindAll with Predicate Filter", activeUsers.length === 2, "Filtered count mismatch: " + activeUsers.length);
+
+  // 7. Test UpdateById
+  var updated = mockRepo.updateById("t2", { status: "SUSPENDED" });
+  var bobAfter = mockRepo.findById("t2");
+  assert("UpdateById Updates Field Correctly", updated === true && bobAfter.status === "SUSPENDED", "UpdateById failed");
+
+  // 8. Test DeleteById
+  var deleted = mockRepo.deleteById("t3");
+  var charlieAfter = mockRepo.findById("t3");
+  assert("DeleteById Removes Entry", deleted === true && charlieAfter === null, "DeleteById failed");
+
+  // 9. Test Count
+  var totalCount = mockRepo.count();
+  assert("Count Returns Total Rows", totalCount === 2, "Total count mismatch: " + totalCount);
+
+  // 10. Test Concrete Repositories Existence
+  assert(
+    "Concrete Repositories (User, AuditLog, Config, Project, ProgressLog) Registered",
+    typeof UserRepository === "object" &&
+    typeof AuditLogRepository === "object" &&
+    typeof ConfigRepository === "object" &&
+    typeof ProjectRepository === "object" &&
+    typeof ProgressLogRepository === "object",
+    "Concrete repositories registration failed"
+  );
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN REPOSITORY: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
