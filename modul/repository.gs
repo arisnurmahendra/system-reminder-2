@@ -114,6 +114,14 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
     sheetName: sheetName,
     headers: schemaHeaders,
     primaryKey: primaryKey || schemaHeaders[0],
+    _dataCache: null,
+
+    /**
+     * Menghapus cache entitas in-memory
+     */
+    invalidateCache: function() {
+      this._dataCache = null;
+    },
 
     /**
      * Memastikan sheet siap dan terinisialisasi
@@ -130,41 +138,45 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
     },
 
     /**
-     * Membaca seluruh data dan memetakan baris menjadi array of object (Batch Read)
+     * Membaca seluruh data dan memetakan baris menjadi array of object (Batch Read with In-Memory Caching)
      * @param {Function} [predicate] - Fungsi filter opsional (item => boolean)
      * @returns {object[]}
      */
     findAll: function(predicate) {
       try {
-        var sheet = this.getSheet();
-        var lastRow = sheet.getLastRow();
-        var lastCol = sheet.getLastColumn();
+        if (!this._dataCache) {
+          var sheet = this.getSheet();
+          var lastRow = sheet.getLastRow();
+          var lastCol = sheet.getLastColumn();
 
-        if (lastRow <= 1 || lastCol === 0) {
-          return [];
+          if (lastRow <= 1 || lastCol === 0) {
+            this._dataCache = [];
+          } else {
+            var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+            var headerRow = values[0];
+            var rawResults = [];
+
+            for (var i = 1; i < values.length; i++) {
+              var row = values[i];
+              var isEmpty = row.every(function(cell) {
+                return cell === "" || cell === null || cell === undefined;
+              });
+              if (isEmpty) continue;
+
+              var item = { _rowIndex: i + 1 };
+              for (var j = 0; j < headerRow.length; j++) {
+                var key = String(headerRow[j]).trim();
+                item[key] = row[j];
+              }
+              rawResults.push(item);
+            }
+            this._dataCache = rawResults;
+          }
         }
 
-        var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-        var headerRow = values[0];
-        var results = [];
-
-        for (var i = 1; i < values.length; i++) {
-          var row = values[i];
-          // Abaikan baris kosong
-          var isEmpty = row.every(function(cell) {
-            return cell === "" || cell === null || cell === undefined;
-          });
-          if (isEmpty) continue;
-
-          var item = { _rowIndex: i + 1 };
-          for (var j = 0; j < headerRow.length; j++) {
-            var key = String(headerRow[j]).trim();
-            item[key] = row[j];
-          }
-
-          if (!predicate || predicate(item)) {
-            results.push(item);
-          }
+        var results = this._dataCache;
+        if (predicate) {
+          results = results.filter(predicate);
         }
 
         return results;
@@ -236,6 +248,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
         }
 
         sheet.appendRow(rowData);
+        this.invalidateCache();
         return entity;
       } catch (err) {
         AppLogger.error("BaseRepo_" + this.sheetName, "Gagal menyimpan data: " + err.message, err);
@@ -273,6 +286,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
         var numCols = this.headers.length;
 
         sheet.getRange(startRow, 1, numRows, numCols).setValues(rowsData);
+        this.invalidateCache();
         return numRows;
       } catch (err) {
         AppLogger.error("BaseRepo_" + this.sheetName, "Gagal melakukan batch insert: " + err.message, err);
@@ -305,6 +319,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
           }
         }
 
+        this.invalidateCache();
         return true;
       } catch (err) {
         AppLogger.error("BaseRepo_" + this.sheetName, "Gagal mengupdate data: " + err.message, err);
@@ -326,6 +341,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
 
         var sheet = this.getSheet();
         sheet.deleteRow(existing._rowIndex);
+        this.invalidateCache();
         return true;
       } catch (err) {
         AppLogger.error("BaseRepo_" + this.sheetName, "Gagal menghapus data: " + err.message, err);

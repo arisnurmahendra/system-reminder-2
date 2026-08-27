@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, Dashboard Analytics, Notification History, & Advanced Report
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, Dashboard Analytics, Notification History, Advanced Report, & Performance Improvement
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -1276,6 +1276,61 @@ function runAllAdvancedReportTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN ADVANCED REPORT: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllPerformanceTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST PERFORMANCE IMPROVEMENT ===");
+
+  // 1. Test Performance Measurement Tool
+  var measureRes = PerformanceBenchmark.measure("Test Measure Function", function() {
+    var sum = 0;
+    for (var i = 0; i < 1000; i++) sum += i;
+    return sum;
+  });
+  assert("Performance Benchmark Measure Tool Captures Duration", 
+    typeof measureRes.durationMs === "number" && measureRes.result === 499500, 
+    "Measure tool failed"
+  );
+
+  // 2. Test In-Memory Cache Invalidation on Insert
+  var testHeaders = ["id", "name"];
+  var repo = createBaseRepository("Test_Perf_Sheet", testHeaders, "id");
+  repo.insert({ id: "p1", name: "Alpha" });
+  assert("Initial FindAll Populates Cache", repo.findAll().length === 1, "Initial read failed");
+
+  repo.insert({ id: "p2", name: "Beta" });
+  assert("Cache Automatically Invalidated on Insert and Reads New Item", repo.findAll().length === 2, "Cache invalidation failed");
+
+  // 3. Test Full Benchmark Suite Execution
+  var allBenchRes = PerformanceBenchmark.runAllBenchmarks();
+  assert("Benchmark Suite Runs Successfully", 
+    allBenchRes.success === true && 
+    Array.isArray(allBenchRes.data.benchmarks) && 
+    allBenchRes.data.totalBenchmarks === 4, 
+    "Benchmark suite failed"
+  );
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN PERFORMANCE: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
