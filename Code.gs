@@ -213,6 +213,17 @@ function apiTriggerDailyReminders() {
   }, "apiTriggerDailyReminders");
 }
 
+function apiSendTestWhatsApp(targetPhone) {
+  return safeWebResponse(function() {
+    var cleanPhone = sanitizeString(targetPhone);
+    var sent = FonnteHelper.sendTestMessage(cleanPhone);
+    return {
+      phone: cleanPhone,
+      sent: sent
+    };
+  }, "apiSendTestWhatsApp");
+}
+
 /**
  * Trigger terjadwal Google Apps Script (Time-driven trigger)
  */

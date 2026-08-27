@@ -44,20 +44,12 @@ var NotificationService = {
 
     // 2. Kirim WhatsApp jika opsi WhatsApp aktif
     if (project.is_wa_active && project.pic_phone) {
-      var waMessage = "⚠️ *PERINGATAN KETERLAMBATAN PROYEK*\n\n"
-        + "Halo *" + project.pic_name + "*,\n"
-        + "Proyek: *" + project.project_name + "* mengalami keterlambatan dari rencana.\n\n"
-        + "📊 Rencana: " + plannedProgress + "%\n"
-        + "📉 Realisasi: " + actualProgress + "%\n"
-        + "⚡ Deviasi: -" + devAbs + "%\n\n"
-        + "Mohon segera ditindaklanjuti.\n"
-        + "_System Reminder 2_";
-
+      var waMessage = FonnteHelper.formatDelayedAlert(project, actualProgress, plannedProgress, deviation);
       results.waSent = FonnteHelper.sendMessage(project.pic_phone, waMessage);
-      writeAuditLog(null, project.pic_phone, "WA_REMINDER_SENT", results.waSent ? "SUCCESS" : "FAILURE", "NotificationService", {
+      AppLogger.audit("NotificationService", "WA_REMINDER_SENT", results.waSent ? "SUCCESS" : "FAILURE", {
         projectId: project.project_id,
         deviation: deviation
-      });
+      }, null, project.pic_phone);
     }
 
     return results;

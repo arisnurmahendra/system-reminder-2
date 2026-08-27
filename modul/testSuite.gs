@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, & Schedule Engine
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, & WhatsApp Integration
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -790,7 +790,6 @@ function runAllScheduleEngineTests() {
   Logger.log("=== MEMULAI TEST SCHEDULE ENGINE ===");
 
   // 1. Test Working Days (Exclude Weekends)
-  // 2026-01-05 (Senin) s.d. 2026-01-11 (Minggu) -> 5 hari kerja (Sen-Jum), 2 hari libur
   var wDays = ScheduleEngine.calculateWorkingDays("2026-01-05", "2026-01-11");
   assert("Working Days Calculation Excludes Weekend (5 days)", wDays === 5, "Working days error: " + wDays);
 
@@ -820,6 +819,64 @@ function runAllScheduleEngineTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN SCHEDULE ENGINE: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllWhatsAppIntegrationTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST WHATSAPP INTEGRATION ===");
+
+  // 1. Test Phone Number Sanitization (08xxx -> 628xxx)
+  var s1 = FonnteHelper.sanitizePhoneNumber("081234567890");
+  var s2 = FonnteHelper.sanitizePhoneNumber("+6281234567890");
+  var s3 = FonnteHelper.sanitizePhoneNumber("62812-3456-7890");
+
+  assert("Sanitize 08xxx to 628xxx", s1 === "6281234567890", "Sanitization 08 error: " + s1);
+  assert("Sanitize +62 to 62", s2 === "6281234567890", "Sanitization +62 error: " + s2);
+  assert("Sanitize Dashes and Spaces", s3 === "6281234567890", "Sanitization dashes error: " + s3);
+
+  // 2. Test Phone Number Validation
+  assert("Valid Phone Number Accepted", FonnteHelper.isValidPhoneNumber("081234567890") === true, "Valid phone failed");
+  assert("Invalid Short Phone Number Rejected", FonnteHelper.isValidPhoneNumber("12345") === false, "Invalid short phone passed");
+
+  // 3. Test Message Template Formatting
+  var dummyProj = { project_name: "Proyek Mall Senayan", pic_name: "Hendro" };
+  var alertMsg = FonnteHelper.formatDelayedAlert(dummyProj, 25, 40, -15);
+  var compMsg = FonnteHelper.formatCompletedAlert(dummyProj);
+  var dailyMsg = FonnteHelper.formatDailyReminder(dummyProj, 30, 35, 12);
+  var testMsg = FonnteHelper.formatTestMessage("6281234567890");
+
+  assert("Delayed Alert Template Contains Project Details", alertMsg.indexOf("Proyek Mall Senayan") !== -1 && alertMsg.indexOf("-15.00%") !== -1, "Delayed template error");
+  assert("Completed Alert Template Contains 100%", compMsg.indexOf("100%") !== -1, "Completed template error");
+  assert("Daily Reminder Template Contains Days Remaining", dailyMsg.indexOf("12 hari") !== -1, "Daily reminder template error");
+  assert("Test Message Template Valid", testMsg.indexOf("UJI KONEKSI WHATSAPP") !== -1, "Test template error");
+
+  // 4. Test Message Delivery via Mock Fonnte
+  var sendRes = FonnteHelper.sendMessage("081234567890", "Test WhatsApp Message");
+  assert("FonnteHelper.sendMessage Successful", sendRes === true, "Message sending failed");
+
+  var testSendRes = FonnteHelper.sendTestMessage("081234567890");
+  assert("FonnteHelper.sendTestMessage Successful", testSendRes === true, "Test message sending failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN WHATSAPP INTEGRATION: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
