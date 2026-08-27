@@ -203,6 +203,12 @@ function apiGetProjectTimeline(projectId, options) {
   }, "apiGetProjectTimeline");
 }
 
+function apiGetDashboardExecutiveSummary() {
+  return safeWebResponse(function() {
+    return DashboardSummaryService.getExecutiveSummary();
+  }, "apiGetDashboardExecutiveSummary");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================

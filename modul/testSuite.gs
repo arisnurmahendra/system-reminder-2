@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, & WhatsApp Integration
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, & Dashboard Summary
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -877,6 +877,52 @@ function runAllWhatsAppIntegrationTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN WHATSAPP INTEGRATION: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllDashboardSummaryTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST DASHBOARD SUMMARY ===");
+
+  // 1. Setup Proyek Tambahan untuk Summary
+  ProjectService.registerProject({
+    projectName: "Proyek Dermaga Tanjung Priok",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    picName: "Bambang",
+    picEmail: "bambang@perusahaan.com"
+  });
+
+  // 2. Test Get Executive Summary
+  var execSummaryRes = DashboardSummaryService.getExecutiveSummary();
+  assert("Executive Summary Produced Successfully", execSummaryRes.success === true && typeof execSummaryRes.data === "object", "Executive summary failed");
+
+  var data = execSummaryRes.data;
+  assert("Total Projects Count is Positive", data.totalProjects > 0, "Total projects zero");
+  assert("Active Projects Count is Positive", data.activeProjects > 0, "Active projects zero");
+  assert("Average Progress Values are Numbers", typeof data.averageActualProgress === "number" && typeof data.averagePlannedProgress === "number", "Average metrics error");
+  assert("Urgent Projects Array Defined", Array.isArray(data.urgentProjects), "Urgent projects missing");
+  assert("Project Details Array Defined with Records", Array.isArray(data.projectDetails) && data.projectDetails.length > 0, "Project details missing");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN DASHBOARD SUMMARY: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

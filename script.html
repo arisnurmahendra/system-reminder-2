@@ -229,6 +229,23 @@
   }
 
   function loadDashboardSummary() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      loadProjects();
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler((response) => {
+        if (response && response.success && response.data) {
+          const sum = response.data;
+          document.getElementById('kpiTotalProjects').textContent = sum.activeProjects;
+          document.getElementById('kpiOnTrack').textContent = sum.onTrackCount;
+          document.getElementById('kpiDelayed').textContent = sum.delayedCount;
+          document.getElementById('kpiCompleted').textContent = sum.completedProjects;
+        }
+      })
+      .apiGetDashboardExecutiveSummary();
+
     loadProjects();
   }
 
