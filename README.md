@@ -180,4 +180,4 @@ System-Reminder-2/
 ## © Lisensi
 Proyek ini dilisensikan di bawah Lisensi MIT - silakan lihat berkas [LICENSE](LICENSE) untuk rinciannya.
 
-**Hak Cipta © 2022–2026 Aris**
+**Hak Cipta © 2022–2026 Aris Nur Mahendra**
