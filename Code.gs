@@ -209,6 +209,18 @@ function apiGetDashboardExecutiveSummary() {
   }, "apiGetDashboardExecutiveSummary");
 }
 
+function apiExportProjectPdf(projectId) {
+  return safeWebResponse(function() {
+    return PdfExportService.exportProjectPdfBlob(sanitizeString(projectId));
+  }, "apiExportProjectPdf");
+}
+
+function apiExportPortfolioPdf() {
+  return safeWebResponse(function() {
+    return PdfExportService.exportPortfolioPdfBlob();
+  }, "apiExportPortfolioPdf");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================

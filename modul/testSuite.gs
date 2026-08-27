@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, & Reminder Email
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, & Export PDF
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -977,6 +977,79 @@ function runAllReminderEmailTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN REMINDER EMAIL: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllPdfExportTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST EXPORT PDF ===");
+
+  // 1. Setup Proyek untuk Export
+  var p = ProjectService.registerProject({
+    projectName: "Proyek Gedung Kesenian Nasional",
+    startDate: "2026-02-01",
+    endDate: "2026-10-31",
+    picName: "Kartika",
+    picEmail: "kartika@perusahaan.com"
+  });
+  var pId = p.data.projectId;
+
+  // 2. Test Generate Project Report HTML
+  var reportHtml = PdfExportService.generateProjectReportHtml(pId);
+  assert("Project Report HTML Generated with Title & PIC", 
+    reportHtml.indexOf("Proyek Gedung Kesenian Nasional") !== -1 && reportHtml.indexOf("Kartika") !== -1, 
+    "Report HTML failed"
+  );
+
+  // 3. Test Generate Portfolio Report HTML
+  var portfolioHtml = PdfExportService.generatePortfolioReportHtml();
+  assert("Portfolio Report HTML Contains Summary Grid", 
+    portfolioHtml.indexOf("RINGKASAN EKSEKUTIF PORTOFOLIO PROYEK") !== -1, 
+    "Portfolio HTML failed"
+  );
+
+  // 4. Test Export Project PDF Blob (Base64)
+  var projectPdf = PdfExportService.exportProjectPdfBlob(pId);
+  assert("Project PDF Export Contains Valid Metadata and Base64", 
+    Boolean(projectPdf.fileName) && projectPdf.fileName.indexOf(".pdf") !== -1 && Boolean(projectPdf.base64), 
+    "Project PDF blob failed"
+  );
+
+  // 5. Test Export Portfolio PDF Blob
+  var portPdf = PdfExportService.exportPortfolioPdfBlob();
+  assert("Portfolio PDF Export Contains Valid Metadata and Base64", 
+    Boolean(portPdf.fileName) && portPdf.fileName.indexOf(".pdf") !== -1 && Boolean(portPdf.base64), 
+    "Portfolio PDF blob failed"
+  );
+
+  // 6. Test Non-Existent Project Rejection
+  var caughtNotFound = false;
+  try {
+    PdfExportService.generateProjectReportHtml("prj_tidak_ada_xyz");
+  } catch (e) {
+    caughtNotFound = true;
+  }
+  assert("Non-Existent Project Throws NotFound Error", caughtNotFound, "Non-existent project passed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN EXPORT PDF: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
