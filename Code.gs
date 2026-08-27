@@ -108,10 +108,16 @@ function apiToggleProjectNotification(projectId, channelType, isEnabled) {
   }, "apiToggleProjectNotification");
 }
 
-function apiDeleteProject(projectId) {
+function apiDeleteProject(projectId, cascade) {
   return safeWebResponse(function() {
-    return ProjectService.deleteProject(sanitizeString(projectId));
+    return ProjectService.deleteProject(sanitizeString(projectId), cascade);
   }, "apiDeleteProject");
+}
+
+function apiSetProjectStatus(projectId, status) {
+  return safeWebResponse(function() {
+    return ProjectService.setProjectStatus(sanitizeString(projectId), sanitizeString(status));
+  }, "apiSetProjectStatus");
 }
 
 // ==========================================

@@ -444,7 +444,7 @@ var UserRepository = (function() {
         username: userObj.username,
         password_hash: userObj.passwordHash,
         salt: userObj.salt,
-        role_name: userObj.roleName || CONFIG.ROLES.REGULAR_USER,
+        role_name: userObj.roleName || userObj.role || CONFIG.ROLES.REGULAR_USER,
         must_change_password: userObj.mustChangePassword !== false,
         failed_login_attempts: 0,
         lockout_until: "",
@@ -454,6 +454,10 @@ var UserRepository = (function() {
       });
 
       return userId;
+    },
+
+    create: function(userObj) {
+      return this.createUser(userObj);
     }
   };
 })();

@@ -1,15 +1,27 @@
 /**
- * Project Service - Logika Bisnis & Pengelolaan Proyek
+ * Project Service - Logika Bisnis & Pengelolaan Siklus Hidup Proyek
  * Mengikuti prinsip Separation of Concerns & Service Pattern
  */
 
 var ProjectService = {
+  // Status Proyek yang Didukung
+  STATUSES: {
+    ACTIVE: "ACTIVE",
+    COMPLETED: "COMPLETED",
+    CANCELLED: "CANCELLED",
+    ARCHIVED: "ARCHIVED"
+  },
+
   /**
    * Mendaftarkan proyek baru ke dalam sistem
    * @param {object} payload
    * @returns {object}
    */
   registerProject: function(payload) {
+    if (!payload || typeof payload !== "object") {
+      throw ErrorFactory.validation("Payload data proyek tidak boleh kosong.");
+    }
+
     validateRequired(payload.projectName, "Nama Proyek");
     validateRequired(payload.startDate, "Tanggal Mulai");
     validateRequired(payload.endDate, "Tanggal Selesai");
@@ -17,18 +29,11 @@ var ProjectService = {
     validateRequired(payload.picEmail, "Email PIC");
 
     if (!isValidEmail(payload.picEmail)) {
-      throw new Error("Format Email PIC tidak valid: " + payload.picEmail);
+      throw ErrorFactory.validation("Format Email PIC tidak valid: " + payload.picEmail);
     }
 
-    var start = new Date(payload.startDate);
-    var end = new Date(payload.endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new Error("Format tanggal mulai atau tanggal selesai tidak valid.");
-    }
-
-    if (start.getTime() > end.getTime()) {
-      throw new Error("Tanggal mulai tidak boleh lebih besar dari tanggal selesai.");
-    }
+    // Validasi rentang tanggal
+    ProgressEngine.validateDateRange(payload.startDate, payload.endDate);
 
     var cleanName = sanitizeString(payload.projectName);
     var existing = ProjectRepository.findAll(function(p) {
@@ -36,7 +41,7 @@ var ProjectService = {
     });
 
     if (existing.length > 0) {
-      throw new Error("Proyek dengan nama '" + cleanName + "' sudah terdaftar.");
+      throw ErrorFactory.businessRule("Proyek dengan nama '" + cleanName + "' sudah terdaftar.", CONFIG.ERROR_CODES.BIZ_DUPLICATE_RESOURCE);
     }
 
     var projectData = {
@@ -48,18 +53,21 @@ var ProjectService = {
       pic_phone: sanitizeString(payload.picPhone || ""),
       is_email_active: payload.isEmailActive !== false,
       is_wa_active: payload.isWaActive !== false,
-      status: "ACTIVE"
+      status: this.STATUSES.ACTIVE,
+      description: sanitizeString(payload.description || "")
     };
 
     var projectId = ProjectRepository.create(projectData);
-    writeAuditLog(null, getCurrentUserEmail_(), "PROJECT_CREATED", "SUCCESS", "ProjectService", {
+    AppLogger.audit("ProjectService", "PROJECT_CREATED", "SUCCESS", {
       projectId: projectId,
-      projectName: cleanName
+      projectName: cleanName,
+      picEmail: projectData.pic_email
     });
 
     return formatSuccessResponse({
       projectId: projectId,
-      projectName: cleanName
+      projectName: cleanName,
+      status: this.STATUSES.ACTIVE
     }, "Proyek berhasil didaftarkan.");
   },
 
@@ -72,7 +80,7 @@ var ProjectService = {
     validateRequired(projectId, "Project ID");
     var project = ProjectRepository.findById(projectId);
     if (!project) {
-      throw new Error("Proyek dengan ID '" + projectId + "' tidak ditemukan.");
+      throw ErrorFactory.notFound("Proyek", projectId);
     }
 
     var summary = this.computeProjectSummary_(project);
@@ -83,7 +91,7 @@ var ProjectService = {
   },
 
   /**
-   * Mengambil semua daftar proyek beserta metrik status
+   * Mengambil semua daftar proyek beserta metrik status dan filter fleksibel
    * @param {object} [filter]
    * @returns {object}
    */
@@ -91,8 +99,30 @@ var ProjectService = {
     var self = this;
     var projects = ProjectRepository.findAll();
 
-    if (filter && filter.status) {
-      projects = projects.filter(function(p) { return p.status === filter.status; });
+    if (filter && typeof filter === "object") {
+      // Filter status
+      if (filter.status && filter.status !== "ALL") {
+        projects = projects.filter(function(p) { return p.status === filter.status; });
+      }
+
+      // Filter PIC Email
+      if (filter.picEmail) {
+        var cleanEmail = String(filter.picEmail).trim().toLowerCase();
+        projects = projects.filter(function(p) {
+          return String(p.pic_email).toLowerCase() === cleanEmail;
+        });
+      }
+
+      // Filter Keyword (Nama Proyek, Nama PIC, atau Deskripsi)
+      if (filter.keyword) {
+        var kw = String(filter.keyword).trim().toLowerCase();
+        projects = projects.filter(function(p) {
+          return (p.project_name && String(p.project_name).toLowerCase().indexOf(kw) !== -1) ||
+                 (p.pic_name && String(p.pic_name).toLowerCase().indexOf(kw) !== -1) ||
+                 (p.pic_email && String(p.pic_email).toLowerCase().indexOf(kw) !== -1) ||
+                 (p.description && String(p.description).toLowerCase().indexOf(kw) !== -1);
+        });
+      }
     }
 
     var list = projects.map(function(p) {
@@ -113,30 +143,88 @@ var ProjectService = {
    */
   updateProject: function(projectId, updates) {
     validateRequired(projectId, "Project ID");
+    if (!updates || typeof updates !== "object") {
+      throw ErrorFactory.validation("Data pembaruan proyek tidak valid.");
+    }
+
     var existing = ProjectRepository.findById(projectId);
     if (!existing) {
-      throw new Error("Proyek tidak ditemukan.");
+      throw ErrorFactory.notFound("Proyek", projectId);
     }
 
     var cleanUpdates = {};
     if (updates.projectName) cleanUpdates.project_name = sanitizeString(updates.projectName);
-    if (updates.startDate) cleanUpdates.start_date = updates.startDate;
-    if (updates.endDate) cleanUpdates.end_date = updates.endDate;
     if (updates.picName) cleanUpdates.pic_name = sanitizeString(updates.picName);
+    if (updates.description !== undefined) cleanUpdates.description = sanitizeString(updates.description);
+
     if (updates.picEmail) {
-      if (!isValidEmail(updates.picEmail)) throw new Error("Format Email PIC tidak valid.");
+      if (!isValidEmail(updates.picEmail)) {
+        throw ErrorFactory.validation("Format Email PIC tidak valid: " + updates.picEmail);
+      }
       cleanUpdates.pic_email = String(updates.picEmail).trim().toLowerCase();
     }
-    if (updates.picPhone !== undefined) cleanUpdates.pic_phone = sanitizeString(updates.picPhone);
-    if (updates.status) cleanUpdates.status = updates.status;
+
+    if (updates.picPhone !== undefined) {
+      cleanUpdates.pic_phone = sanitizeString(updates.picPhone);
+    }
+
+    // Validasi perubahan tanggal
+    var newStart = updates.startDate || existing.start_date;
+    var newEnd = updates.endDate || existing.end_date;
+    if (updates.startDate || updates.endDate) {
+      ProgressEngine.validateDateRange(newStart, newEnd);
+      if (updates.startDate) cleanUpdates.start_date = updates.startDate;
+      if (updates.endDate) cleanUpdates.end_date = updates.endDate;
+    }
+
+    if (updates.status) {
+      this.validateStatusValue_(updates.status);
+      cleanUpdates.status = updates.status;
+    }
+
+    if (updates.isEmailActive !== undefined) cleanUpdates.is_email_active = Boolean(updates.isEmailActive);
+    if (updates.isWaActive !== undefined) cleanUpdates.is_wa_active = Boolean(updates.isWaActive);
 
     var updated = ProjectRepository.update(projectId, cleanUpdates);
-    writeAuditLog(null, getCurrentUserEmail_(), "PROJECT_UPDATED", "SUCCESS", "ProjectService", {
+    AppLogger.audit("ProjectService", "PROJECT_UPDATED", "SUCCESS", {
       projectId: projectId,
       updatedFields: Object.keys(cleanUpdates)
     });
 
-    return formatSuccessResponse({ updated: updated }, "Data proyek berhasil diperbarui.");
+    return formatSuccessResponse({
+      projectId: projectId,
+      updated: updated
+    }, "Data proyek berhasil diperbarui.");
+  },
+
+  /**
+   * Mengubah status siklus hidup proyek (ACTIVE, COMPLETED, CANCELLED, ARCHIVED)
+   * @param {string} projectId
+   * @param {string} newStatus
+   * @returns {object}
+   */
+  setProjectStatus: function(projectId, newStatus) {
+    validateRequired(projectId, "Project ID");
+    validateRequired(newStatus, "Status Proyek");
+
+    this.validateStatusValue_(newStatus);
+
+    var existing = ProjectRepository.findById(projectId);
+    if (!existing) {
+      throw ErrorFactory.notFound("Proyek", projectId);
+    }
+
+    var updated = ProjectRepository.update(projectId, { status: newStatus });
+    AppLogger.audit("ProjectService", "PROJECT_STATUS_CHANGED", "SUCCESS", {
+      projectId: projectId,
+      oldStatus: existing.status,
+      newStatus: newStatus
+    });
+
+    return formatSuccessResponse({
+      projectId: projectId,
+      status: newStatus
+    }, "Status proyek berhasil diubah menjadi " + newStatus + ".");
   },
 
   /**
@@ -154,11 +242,11 @@ var ProjectService = {
     } else if (channelType === "wa") {
       updates.is_wa_active = Boolean(isEnabled);
     } else {
-      throw new Error("Saluran notifikasi tidak valid (hanya 'email' atau 'wa').");
+      throw ErrorFactory.validation("Saluran notifikasi tidak valid (hanya 'email' atau 'wa').");
     }
 
     ProjectRepository.update(projectId, updates);
-    writeAuditLog(null, getCurrentUserEmail_(), "NOTIFICATION_TOGGLED", "SUCCESS", "ProjectService", {
+    AppLogger.audit("ProjectService", "NOTIFICATION_TOGGLED", "SUCCESS", {
       projectId: projectId,
       channel: channelType,
       enabled: Boolean(isEnabled)
@@ -174,18 +262,59 @@ var ProjectService = {
   /**
    * Menghapus proyek dari sistem (Restricted to Administrator / Project Manager)
    * @param {string} projectId
+   * @param {boolean} [cascade=true] - Otomatis menghapus log progres terkait jika true
    * @returns {object}
    */
-  deleteProject: function(projectId) {
+  deleteProject: function(projectId, cascade) {
     enforceRoles_([CONFIG.ROLES.ADMINISTRATOR, CONFIG.ROLES.PROJECT_MANAGER]);
     validateRequired(projectId, "Project ID");
 
+    var existing = ProjectRepository.findById(projectId);
+    if (!existing) {
+      throw ErrorFactory.notFound("Proyek", projectId);
+    }
+
+    var shouldCascade = cascade !== false;
+    var deletedLogsCount = 0;
+
+    if (shouldCascade) {
+      var logs = ProgressLogRepository.findByProject(projectId);
+      for (var i = 0; i < logs.length; i++) {
+        if (logs[i].log_id) {
+          ProgressLogRepository.delete(logs[i].log_id);
+          deletedLogsCount++;
+        }
+      }
+    }
+
     var deleted = ProjectRepository.delete(projectId);
-    writeAuditLog(null, getCurrentUserEmail_(), "PROJECT_DELETED", "SUCCESS", "ProjectService", {
-      projectId: projectId
+    AppLogger.audit("ProjectService", "PROJECT_DELETED", "SUCCESS", {
+      projectId: projectId,
+      projectName: existing.project_name,
+      deletedLogsCount: deletedLogsCount
     });
 
-    return formatSuccessResponse({ deleted: deleted }, "Proyek berhasil dihapus.");
+    return formatSuccessResponse({
+      deleted: deleted,
+      deletedLogsCount: deletedLogsCount
+    }, "Proyek dan " + deletedLogsCount + " log terkait berhasil dihapus.");
+  },
+
+  /**
+   * Helper internal untuk memvalidasi nilai status
+   * @private
+   */
+  validateStatusValue_: function(status) {
+    var validStatuses = [
+      this.STATUSES.ACTIVE,
+      this.STATUSES.COMPLETED,
+      this.STATUSES.CANCELLED,
+      this.STATUSES.ARCHIVED
+    ];
+
+    if (validStatuses.indexOf(status) === -1) {
+      throw ErrorFactory.validation("Status proyek '" + status + "' tidak valid. Pilihan: " + validStatuses.join(", "));
+    }
   },
 
   /**
@@ -193,7 +322,7 @@ var ProjectService = {
    * @private
    */
   computeProjectSummary_: function(project) {
-    var today = new Date().toISOString().split("T")[0];
+    var today = ProgressEngine.formatDateYMD_(new Date());
     var planned = ProgressEngine.calculatePlannedProgress(project.start_date, project.end_date, today, "LINEAR");
     
     // Ambil log progres terbaru

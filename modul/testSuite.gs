@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, & Progress Engine
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, & Project Management
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -241,7 +241,7 @@ function runAllServiceTests() {
 
   // 4. Test Project Service Registration & Validation
   var projPayload = {
-    projectName: "Proyek Gedung A",
+    projectName: "Proyek Baseline 1",
     startDate: "2026-01-01",
     endDate: "2026-12-31",
     picName: "Budi Santoso",
@@ -532,6 +532,121 @@ function runAllProgressEngineTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN PROGRESS ENGINE: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllProjectManagementTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST PROJECT MANAGEMENT ===");
+
+  // 1. Test Register Project
+  var p1 = ProjectService.registerProject({
+    projectName: "Proyek Jembatan Suramadu II",
+    startDate: "2026-03-01",
+    endDate: "2026-11-30",
+    picName: "Siti Rahma",
+    picEmail: "siti.rahma@perusahaan.com",
+    picPhone: "081987654321",
+    description: "Konstruksi jembatan penghubung sisi timur"
+  });
+
+  assert("Project Registered with ACTIVE Status", p1.success === true && p1.data.status === "ACTIVE", "Register failed");
+  var p1Id = p1.data.projectId;
+
+  // 2. Test Duplicate Name Prevention
+  var caughtDup = false;
+  try {
+    ProjectService.registerProject({
+      projectName: "Proyek Jembatan Suramadu II",
+      startDate: "2026-03-01",
+      endDate: "2026-11-30",
+      picName: "Lainnya",
+      picEmail: "other@perusahaan.com"
+    });
+  } catch (e) {
+    caughtDup = true;
+  }
+  assert("Duplicate Project Name Rejected", caughtDup, "Duplicate passed");
+
+  // 3. Test Invalid PIC Email Prevention
+  var caughtEmail = false;
+  try {
+    ProjectService.registerProject({
+      projectName: "Proyek Invalid Email",
+      startDate: "2026-01-01",
+      endDate: "2026-06-01",
+      picName: "Tester",
+      picEmail: "invalid-email-format"
+    });
+  } catch (e) {
+    caughtEmail = true;
+  }
+  assert("Invalid PIC Email Rejected", caughtEmail, "Invalid email passed");
+
+  // 4. Test Search & Filter Projects
+  var searchKw = ProjectService.getAllProjects({ keyword: "Suramadu" });
+  assert("Search by Keyword (Suramadu) Returns Match", searchKw.success === true && searchKw.data.length >= 1, "Keyword search failed");
+
+  var searchEmail = ProjectService.getAllProjects({ picEmail: "siti.rahma@perusahaan.com" });
+  assert("Search by PIC Email Returns Match", searchEmail.success === true && searchEmail.data.length >= 1, "PIC Email search failed");
+
+  // 5. Test Update Project
+  var updateRes = ProjectService.updateProject(p1Id, {
+    picName: "Siti Rahma, S.T.",
+    description: "Deskripsi diperbarui dengan penambahan scope"
+  });
+  var p1Updated = ProjectService.getProjectById(p1Id);
+  assert("Project Info Updated Successfully", 
+    updateRes.success === true && p1Updated.data.project.pic_name === "Siti Rahma, S.T.", 
+    "Update project failed"
+  );
+
+  // 6. Test Status Lifecycle Transitions
+  var statusRes = ProjectService.setProjectStatus(p1Id, "COMPLETED");
+  var p1Completed = ProjectService.getProjectById(p1Id);
+  assert("Status Transition to COMPLETED Works", statusRes.success === true && p1Completed.data.project.status === "COMPLETED", "Status transition failed");
+
+  var caughtInvalidStatus = false;
+  try {
+    ProjectService.setProjectStatus(p1Id, "STATUS_PALSU");
+  } catch (e) {
+    caughtInvalidStatus = true;
+  }
+  assert("Invalid Status Transition Rejected", caughtInvalidStatus, "Invalid status passed");
+
+  // 7. Test Delete Project with Cascade
+  if (!UserRepository.findByEmail("admin@test.com")) {
+    UserRepository.create({
+      user_id: "u_admin_test",
+      email: "admin@test.com",
+      role: CONFIG.ROLES.ADMINISTRATOR,
+      status: "ACTIVE"
+    });
+  }
+
+  var deleteRes = ProjectService.deleteProject(p1Id, true);
+  var p1AfterDelete = ProjectRepository.findById(p1Id);
+  assert("Project and Cascade Deletion Works", deleteRes.success === true && p1AfterDelete === null, "Delete project failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN PROJECT MANAGEMENT: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
