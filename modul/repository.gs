@@ -494,6 +494,10 @@ var AuditLogRepository = (function() {
       var logs = base.findAll();
       var max = limit || 50;
       return logs.slice(-max).reverse();
+    },
+
+    findAll: function(filterFn) {
+      return base.findAll(filterFn);
     }
   };
 })();

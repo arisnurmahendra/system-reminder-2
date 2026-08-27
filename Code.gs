@@ -239,6 +239,18 @@ function apiGetProjectAnalytics(projectId) {
   }, "apiGetProjectAnalytics");
 }
 
+function apiGetNotificationHistory(filters) {
+  return safeWebResponse(function() {
+    return NotificationHistoryService.getNotificationHistory(filters);
+  }, "apiGetNotificationHistory");
+}
+
+function apiGetNotificationStats() {
+  return safeWebResponse(function() {
+    return NotificationHistoryService.getNotificationStats();
+  }, "apiGetNotificationStats");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================

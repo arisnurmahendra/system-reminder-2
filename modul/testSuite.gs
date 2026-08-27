@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, & Dashboard Analytics
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, Reminder Email, Export PDF, Google Drive Integration, Dashboard Analytics, & Notification History
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -1159,6 +1159,60 @@ function runAllAnalyticsTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN DASHBOARD ANALYTICS: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllNotificationHistoryTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST NOTIFICATION HISTORY ===");
+
+  // 1. Test Fetch History List
+  var historyRes = NotificationHistoryService.getNotificationHistory();
+  assert("Notification History Retrieved", historyRes.success === true && Array.isArray(historyRes.data.logs), "History list retrieval failed");
+
+  // 2. Test Channel Filtering (EMAIL vs WHATSAPP)
+  var emailOnlyRes = NotificationHistoryService.getNotificationHistory({ channel: "EMAIL" });
+  assert("Filter Channel EMAIL Works", 
+    emailOnlyRes.success === true && 
+    emailOnlyRes.data.logs.every(function(l) { return l.channel === "EMAIL"; }),
+    "Email channel filter failed"
+  );
+
+  var waOnlyRes = NotificationHistoryService.getNotificationHistory({ channel: "WHATSAPP" });
+  assert("Filter Channel WHATSAPP Works", 
+    waOnlyRes.success === true && 
+    waOnlyRes.data.logs.every(function(l) { return l.channel === "WHATSAPP"; }),
+    "WhatsApp channel filter failed"
+  );
+
+  // 3. Test Notification Statistics Computation
+  var statsRes = NotificationHistoryService.getNotificationStats();
+  assert("Notification Stats Computed", 
+    statsRes.success === true && 
+    typeof statsRes.data.totalSent === "number" && 
+    typeof statsRes.data.successRate === "number",
+    "Notification stats computation failed"
+  );
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN NOTIFICATION HISTORY: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
