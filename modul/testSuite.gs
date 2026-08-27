@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, & Project Management
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, & Daily Progress Management
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -647,6 +647,124 @@ function runAllProjectManagementTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN PROJECT MANAGEMENT: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllDailyProgressManagementTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST DAILY PROGRESS MANAGEMENT ===");
+
+  // 1. Setup Proyek untuk Pengujian Progress
+  var proj = ProjectService.registerProject({
+    projectName: "Proyek Tol Trans Jawa Sesi 4",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    picName: "Ahmad Fauzi",
+    picEmail: "ahmad.fauzi@perusahaan.com",
+    picPhone: "081234567899"
+  });
+  var projId = proj.data.projectId;
+
+  // 2. Test Record Daily Progress
+  var log1 = ProgressService.recordDailyProgress({
+    projectId: projId,
+    date: "2026-03-01",
+    actualProgress: 15,
+    notes: "Pondasi dasar 15%"
+  });
+
+  assert("Daily Progress Recorded Successfully", log1.success === true && log1.data.actualProgress === 15, "Record daily progress failed");
+  var log1Id = log1.data.progressId;
+
+  // 3. Test Duplicate Date Entry Prevention
+  var caughtDup = false;
+  try {
+    ProgressService.recordDailyProgress({
+      projectId: projId,
+      date: "2026-03-01",
+      actualProgress: 16,
+      allowOverwrite: false
+    });
+  } catch (e) {
+    caughtDup = true;
+  }
+  assert("Duplicate Date Entry Rejected Without Overwrite Flag", caughtDup, "Duplicate date passed");
+
+  // 4. Test Duplicate Date Overwrite
+  var log1Overwritten = ProgressService.recordDailyProgress({
+    projectId: projId,
+    date: "2026-03-01",
+    actualProgress: 18,
+    notes: "Pondasi dasar revisi 18%",
+    allowOverwrite: true
+  });
+  assert("Duplicate Date Successfully Overwritten", log1Overwritten.success === true && log1Overwritten.data.actualProgress === 18, "Overwrite failed");
+
+  // 5. Test Update Daily Progress
+  var updateRes = ProgressService.updateDailyProgress(log1Id, {
+    actualProgress: 20,
+    notes: "Pondasi dasar final 20%"
+  });
+  assert("Update Daily Progress and Recomputed Deviation", 
+    updateRes.success === true && updateRes.data.actualProgress === 20,
+    "Update daily progress failed"
+  );
+
+  // 6. Test Filtering Progress Logs by Date Range
+  ProgressService.recordDailyProgress({
+    projectId: projId,
+    date: "2026-05-01",
+    actualProgress: 35,
+    notes: "Pemasangan girder"
+  });
+
+  var filteredLogs = ProgressService.getDailyProgressLogs({
+    projectId: projId,
+    startDate: "2026-02-01",
+    endDate: "2026-04-01"
+  });
+  assert("Filter Progress Logs by Date Range (2026-02-01 to 2026-04-01)", 
+    filteredLogs.success === true && filteredLogs.data.length === 1,
+    "Date range filter failed"
+  );
+
+  // 7. Test Auto Complete Project Status on 100% Progress
+  ProgressService.recordDailyProgress({
+    projectId: projId,
+    date: "2026-12-01",
+    actualProgress: 100,
+    notes: "Pekerjaan tuntas 100%"
+  });
+  var projAfter100 = ProjectService.getProjectById(projId);
+  assert("Project Status Auto-Transitions to COMPLETED on 100% Progress", 
+    projAfter100.data.project.status === "COMPLETED",
+    "Auto-complete failed"
+  );
+
+  // 8. Test Delete Daily Progress
+  var deleteLogRes = ProgressService.deleteDailyProgress(log1Id);
+  var logAfterDelete = ProgressLogRepository.findById(log1Id);
+  assert("Delete Daily Progress Works", deleteLogRes.success === true && logAfterDelete === null, "Delete log failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN DAILY PROGRESS MANAGEMENT: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

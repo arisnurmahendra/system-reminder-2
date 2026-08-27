@@ -587,6 +587,12 @@ var ProgressLogRepository = (function() {
   return {
     init: function() { return base.init(); },
     getSheet: function() { return base.getSheet(); },
+    findAll: function(predicate) {
+      return base.findAll(predicate);
+    },
+    findById: function(progressId) {
+      return base.findById(progressId);
+    },
     findByProject: function(projectId) {
       return base.findByField("project_id", projectId);
     },
@@ -599,6 +605,12 @@ var ProgressLogRepository = (function() {
     },
     addBatchProgress: function(progressList) {
       return base.insertBatch(progressList);
+    },
+    update: function(progressId, updates) {
+      return base.updateById(progressId, updates);
+    },
+    delete: function(progressId) {
+      return base.deleteById(progressId);
     }
   };
 })();

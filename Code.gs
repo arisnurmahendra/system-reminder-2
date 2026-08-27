@@ -130,6 +130,24 @@ function apiRecordDailyProgress(payload) {
   }, "apiRecordDailyProgress");
 }
 
+function apiUpdateDailyProgress(logId, updates) {
+  return safeWebResponse(function() {
+    return ProgressService.updateDailyProgress(sanitizeString(logId), updates);
+  }, "apiUpdateDailyProgress");
+}
+
+function apiDeleteDailyProgress(logId) {
+  return safeWebResponse(function() {
+    return ProgressService.deleteDailyProgress(sanitizeString(logId));
+  }, "apiDeleteDailyProgress");
+}
+
+function apiGetDailyProgressLogs(filters) {
+  return safeWebResponse(function() {
+    return ProgressService.getDailyProgressLogs(filters);
+  }, "apiGetDailyProgressLogs");
+}
+
 function apiGetProgressHistory(projectId, order) {
   return safeWebResponse(function() {
     return ProgressService.getProgressHistory(sanitizeString(projectId), sanitizeString(order));
