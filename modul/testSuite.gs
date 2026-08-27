@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, & Dashboard Summary
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, Schedule Engine, WhatsApp Integration, Dashboard Summary, & Reminder Email
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -923,6 +923,60 @@ function runAllDashboardSummaryTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN DASHBOARD SUMMARY: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllReminderEmailTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST REMINDER EMAIL ===");
+
+  var dummyProj = {
+    project_name: "Proyek LRT Koridor Barat",
+    pic_name: "Dimas",
+    start_date: "2026-01-01",
+    end_date: "2026-12-31"
+  };
+
+  // 1. Test HTML Template Builders
+  var delayedHtml = EmailHelper.buildDelayedAlertHtml(dummyProj, 20, 35, -15, 120);
+  var completedHtml = EmailHelper.buildCompletedAlertHtml(dummyProj);
+  var dailyHtml = EmailHelper.buildDailyReminderHtml(dummyProj, 20, 25, 150);
+  var testHtml = EmailHelper.buildTestEmailHtml("dimas@perusahaan.com");
+
+  assert("Delayed Email HTML Contains Project Name & Deviation", delayedHtml.indexOf("Proyek LRT Koridor Barat") !== -1 && delayedHtml.indexOf("-15.00%") !== -1, "Delayed HTML template error");
+  assert("Completed Email HTML Contains 100% Badge", completedHtml.indexOf("COMPLETED (100%)") !== -1, "Completed HTML template error");
+  assert("Daily Reminder Email HTML Contains Target", dailyHtml.indexOf("25%") !== -1, "Daily reminder HTML template error");
+  assert("Test Email HTML Contains Confirmation Badge", testHtml.indexOf("TERHUBUNG & AKTIF") !== -1, "Test email HTML template error");
+
+  // 2. Test Email Delivery via Mock GmailApp
+  var sendRes = EmailHelper.sendEmail("dimas@perusahaan.com", "Test Subject", "<p>Hello</p>");
+  assert("EmailHelper.sendEmail to Valid Email Succeeds", sendRes === true, "Send email failed");
+
+  var testSendRes = EmailHelper.sendTestEmail("dimas@perusahaan.com");
+  assert("EmailHelper.sendTestEmail Succeeds", testSendRes === true, "Send test email failed");
+
+  var invalidSendRes = EmailHelper.sendEmail("invalid-email-address", "Test Subject", "<p>Hello</p>");
+  assert("EmailHelper.sendEmail to Invalid Email Fails Gracefully", invalidSendRes === false, "Invalid email succeeded unexpectedly");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN REMINDER EMAIL: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

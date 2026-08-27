@@ -230,6 +230,17 @@ function apiSendTestWhatsApp(targetPhone) {
   }, "apiSendTestWhatsApp");
 }
 
+function apiSendTestEmail(recipientEmail) {
+  return safeWebResponse(function() {
+    var cleanEmail = sanitizeString(recipientEmail);
+    var sent = EmailHelper.sendTestEmail(cleanEmail);
+    return {
+      email: cleanEmail,
+      sent: sent
+    };
+  }, "apiSendTestEmail");
+}
+
 /**
  * Trigger terjadwal Google Apps Script (Time-driven trigger)
  */

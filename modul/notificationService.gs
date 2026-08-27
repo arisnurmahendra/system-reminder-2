@@ -19,27 +19,12 @@ var NotificationService = {
     // 1. Kirim Email jika opsi Email aktif
     if (project.is_email_active && project.pic_email) {
       var subject = "⚠️ [Peringatan Proyek] Keterlambatan: " + project.project_name;
-      var htmlBody = ""
-        + "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>"
-        + "<h2 style='color: #e11d48;'>⚠️ Peringatan Keterlambatan Proyek</h2>"
-        + "<p>Halo <strong>" + project.pic_name + "</strong>,</p>"
-        + "<p>Sistem mendeteksi bahwa progres proyek berikut berada di bawah target rencana:</p>"
-        + "<table style='width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px;'>"
-        + "<tr style='background: #f8fafc;'><td style='padding: 8px; border: 1px solid #cbd5e1;'><strong>Nama Proyek</strong></td><td style='padding: 8px; border: 1px solid #cbd5e1;'>" + project.project_name + "</td></tr>"
-        + "<tr><td style='padding: 8px; border: 1px solid #cbd5e1;'><strong>Target Rencana</strong></td><td style='padding: 8px; border: 1px solid #cbd5e1;'>" + plannedProgress + "%</td></tr>"
-        + "<tr style='background: #f8fafc;'><td style='padding: 8px; border: 1px solid #cbd5e1;'><strong>Realisasi Aktual</strong></td><td style='padding: 8px; border: 1px solid #cbd5e1; color: #e11d48; font-weight: bold;'>" + actualProgress + "%</td></tr>"
-        + "<tr><td style='padding: 8px; border: 1px solid #cbd5e1;'><strong>Deviasi Keterlambatan</strong></td><td style='padding: 8px; border: 1px solid #cbd5e1; color: #e11d48; font-weight: bold;'>-" + devAbs + "%</td></tr>"
-        + "</table>"
-        + "<p>Mohon segera melakukan tindakan percepatan untuk mengejar keterlambatan jadwal.</p>"
-        + "<hr style='border: none; border-top: 1px solid #e2e8f0; margin-top: 20px;'>"
-        + "<p style='font-size: 12px; color: #64748b;'>Notifikasi otomatis dari System Reminder 2.</p>"
-        + "</div>";
-
+      var htmlBody = EmailHelper.buildDelayedAlertHtml(project, actualProgress, plannedProgress, deviation);
       results.emailSent = EmailHelper.sendEmail(project.pic_email, subject, htmlBody);
-      writeAuditLog(null, project.pic_email, "EMAIL_REMINDER_SENT", results.emailSent ? "SUCCESS" : "FAILURE", "NotificationService", {
+      AppLogger.audit("NotificationService", "EMAIL_REMINDER_SENT", results.emailSent ? "SUCCESS" : "FAILURE", {
         projectId: project.project_id,
         deviation: deviation
-      });
+      }, null, project.pic_email);
     }
 
     // 2. Kirim WhatsApp jika opsi WhatsApp aktif
