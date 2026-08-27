@@ -95,8 +95,8 @@ Pengembangan fitur dilakukan berdasarkan **Mekanisme AI Workflow** (*Analyze ➔
 ### Tahap 1: Fondasi & Keamanan
 - **Security Baseline Control (POL.ISMS.001)**
   - [x] Analyze & Design
-  - [ ] Implement
-  - [ ] Review & Test
+  - [x] Implement
+  - [x] Review & Test
   - [x] Document
 - **Perhitungan Progress**
   - [ ] Analyze & Design
@@ -174,17 +174,25 @@ System-Reminder-2/
 │   ├── script.js                   # Interaksi & logika antarmuka sisi klien (frontend)
 │   └── style.css                   # Tampilan & gaya visual antarmuka (CSS)
 ├── modul/
+│   ├── auditLogger.gs              # Logger interceptor & masking data sensitif
+│   ├── authPolicy.gs               # Kebijakan password & salted SHA-256 hashing
+│   ├── authService.gs              # Layanan otentikasi, lockout & session manager
+│   ├── config.gs                   # Konfigurasi terpusat aplikasi (CONFIG)
 │   ├── dashboard.gs                # Logika backend pemrosesan data dashboard
 │   ├── email.gs                    # Modul pengiriman notifikasi via Gmail API
 │   ├── fonnte.gs                   # Modul pengiriman notifikasi WhatsApp via Fonnte API
 │   ├── hitung-progres.gs           # Logika kalkulasi progres, Kurva S, & keterlambatan
-│   └── repository.gs               # Abstraksi akses data & operasi Google Sheets
+│   ├── repository.gs               # Abstraksi akses data & operasi Google Sheets
+│   ├── securityUtils.gs            # Validasi input, sanitasi, rahasia & otorisasi RBAC
+│   └── testSuite.gs                # Unit test & verifikasi keamanan otomatis
 ├── .claspignore                    # Pengaturan file yang diabaikan oleh Clasp CLI
 ├── .gitignore                      # Pengaturan file yang diabaikan oleh Git
 ├── .prettierignore                 # Pengaturan file yang diabaikan oleh Prettier
 ├── .prettierrc                     # Konfigurasi format kode Prettier
 ├── Code.gs                         # Entry point utama Web App & routing Google Apps Script
 ├── Index.html                      # Halaman utama aplikasi (HTML UI)
+├── script.html                     # Parsial JavaScript untuk antarmuka web
+├── style.html                      # Parsial CSS untuk antarmuka web
 ├── gas2git.cmd                     # Skrip otomasi tarik kode dari GAS ke repositori Git
 ├── git2gas.cmd                     # Skrip otomasi dorong kode dari Git ke GAS
 ├── LICENSE                         # Berkas Lisensi MIT

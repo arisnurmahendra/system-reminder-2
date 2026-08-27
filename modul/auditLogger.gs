@@ -1,15 +1,17 @@
 /**
- * Logger Interceptor & Sensitive Data Masking
- * Mengikuti standar keamanan POL.ISMS.001
+ * Logger Interceptor & Sensitive Data Masking (POL.ISMS.001)
+ * Memastikan data sensitif tidak pernah tercatat di log sheet maupun console Apps Script.
  */
 
 var SENSITIVE_KEYWORDS = [
   "password", "oldpassword", "newpassword", "pin", "secret",
-  "token", "authorization", "totp_secret", "credit_card"
+  "token", "authorization", "totp_secret", "credit_card", "apikey"
 ];
 
 /**
- * Filter Masking Data Sensitif agar TIDAK Pernah Tercatat di Log
+ * Filter Masking Data Sensitif secara rekursif
+ * @param {*} obj
+ * @returns {*}
  */
 function sanitizeLogData_(obj) {
   if (obj === null || obj === undefined) return obj;
@@ -19,13 +21,15 @@ function sanitizeLogData_(obj) {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(sanitizeLogData_);
+    return obj.map(function(item) {
+      return sanitizeLogData_(item);
+    });
   }
 
   if (typeof obj === "object") {
     var sanitized = {};
     for (var key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         var lowerKey = key.toLowerCase();
         var isSensitive = SENSITIVE_KEYWORDS.some(function(keyword) {
           return lowerKey.indexOf(keyword) !== -1;
@@ -33,7 +37,7 @@ function sanitizeLogData_(obj) {
 
         if (isSensitive) {
           sanitized[key] = "[REDACTED]";
-        } else if (typeof obj[key] === "object") {
+        } else if (typeof obj[key] === "object" && obj[key] !== null) {
           sanitized[key] = sanitizeLogData_(obj[key]);
         } else {
           sanitized[key] = obj[key];
@@ -47,37 +51,34 @@ function sanitizeLogData_(obj) {
 }
 
 /**
- * Mencatat Audit Log ke Sheet Audit_Logs secara Aman
+ * Mencatat Audit Log ke Sheet Audit_Logs secara Terproteksi
+ * @param {string|null} userId
+ * @param {string|null} userEmail
+ * @param {string} action
+ * @param {string} status - "SUCCESS" | "FAILURE" | "WARNING"
+ * @param {string} pageRef
+ * @param {object} [details]
  */
 function writeAuditLog(userId, userEmail, action, status, pageRef, details) {
   try {
-    var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
-    var sheet = ss.getSheetByName(CONFIG.SPREADSHEET.SHEETS.AUDIT_LOGS);
-    
-    if (!sheet) {
-      sheet = ss.insertSheet(CONFIG.SPREADSHEET.SHEETS.AUDIT_LOGS);
-      sheet.appendRow(["log_id", "timestamp", "user_id", "user_email", "action", "status", "page_reference", "details"]);
-    }
-
     var sanitizedDetails = sanitizeLogData_(details || {});
     var logId = "log_" + Utilities.getUuid();
     var timestamp = new Date().toISOString();
-    var email = userEmail || Session.getActiveUser().getEmail() || "ANONYMOUS";
+    var email = userEmail || getCurrentUserEmail_() || "ANONYMOUS";
 
-    sheet.appendRow([
-      logId,
-      timestamp,
-      userId || "N/A",
-      email,
-      action,
-      status,
-      pageRef || "GAS_WebApp",
-      JSON.stringify(sanitizedDetails)
-    ]);
+    AuditLogRepository.appendLog({
+      logId: logId,
+      timestamp: timestamp,
+      userId: userId || "N/A",
+      userEmail: email,
+      action: action,
+      status: status || "INFO",
+      pageReference: pageRef || "GAS_WebApp",
+      details: sanitizedDetails
+    });
 
-    // Opsional log ke Logger internal Apps Script
     Logger.log("[AUDIT] " + action + " | Status: " + status + " | User: " + email);
   } catch (err) {
-    console.error("Gagal mencatat audit log:", err);
+    console.error("Gagal mencatat audit log:", err.message || err);
   }
 }

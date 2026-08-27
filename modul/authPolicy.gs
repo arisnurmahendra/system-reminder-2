@@ -1,7 +1,7 @@
 /**
- * Pola Kebijakan Password POL.ISMS.001:
- * Kombinasi huruf besar, huruf kecil, angka, dan karakter khusus.
+ * Pola Kebijakan Password & Salted Cryptography Hashing (POL.ISMS.001)
  */
+
 var PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]).+$/;
 
 /**
@@ -11,12 +11,14 @@ var PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}
  * @returns {object} { valid: boolean, message: string }
  */
 function validatePasswordPolicy(password, isPrivilegedRole) {
-  var minLength = isPrivilegedRole ? 14 : 8;
+  var minLength = isPrivilegedRole 
+    ? (CONFIG.SECURITY.PASSWORD_MIN_LENGTH_ADMIN || 14) 
+    : (CONFIG.SECURITY.PASSWORD_MIN_LENGTH_USER || 8);
 
-  if (!password || password.length < minLength) {
+  if (!password || typeof password !== "string" || password.length < minLength) {
     return {
       valid: false,
-      message: "Password minimum " + minLength + " karakter untuk peran " + (isPrivilegedRole ? "Administrator" : "Pengguna Biasa") + "."
+      message: "Password minimum " + minLength + " karakter untuk peran " + (isPrivilegedRole ? "Administrator" : "Pengguna") + "."
     };
   }
 
@@ -32,7 +34,7 @@ function validatePasswordPolicy(password, isPrivilegedRole) {
 
 /**
  * Membuat Salt acak menggunakan Utilities.getUuid()
- * @returns {string} Salt acak 32 karakter heksadesimal
+ * @returns {string} Salt acak heksadesimal
  */
 function generateSalt() {
   return Utilities.getUuid().replace(/-/g, '');
@@ -52,7 +54,7 @@ function hashPasswordWithSalt(password, salt) {
     var byteVal = rawHash[i];
     if (byteVal < 0) byteVal += 256;
     var byteStr = byteVal.toString(16);
-    if (byteStr.length == 1) byteStr = "0" + byteStr;
+    if (byteStr.length === 1) byteStr = "0" + byteStr;
     txtHash += byteStr;
   }
   return txtHash;

@@ -1,63 +1,267 @@
 /**
- * Safe Script Properties, Access Control, & Error Handler
+ * Safe Script Properties, Input Validation, Sanitization, Access Control, & Error Handling
  * Mengikuti standar keamanan POL.ISMS.001
  */
 
+// ==========================================
+// 1. SECRET MANAGEMENT (PropertiesService)
+// ==========================================
+
 /**
- * Mengambil rahasia sistem dari Script Properties (Bukan hardcode)
+ * Mengambil rahasia sistem dari Script Properties secara aman
+ * @param {string} key - Nama property key
+ * @returns {string|null}
  */
 function getScriptSecret_(key) {
   var props = PropertiesService.getScriptProperties();
   var secret = props.getProperty(key);
   if (!secret) {
-    console.warn("Script Property " + key + " belum dikonfigurasi.");
+    console.warn("Script Property '" + key + "' belum dikonfigurasi.");
   }
   return secret;
 }
 
 /**
- * Menyiapkan Token Fonnte API secara aman
+ * Menyimpan konfigurasi rahasia ke Script Properties (Hanya role ADMINISTRATOR)
+ * @param {string} key - Nama property key
+ * @param {string} value - Nilai property
+ * @returns {object}
+ */
+function setScriptSecret_(key, value) {
+  enforceAdminRole_();
+  if (!key || typeof key !== "string") {
+    throw new Error("Kunci konfigurasi tidak valid.");
+  }
+  PropertiesService.getScriptProperties().setProperty(key, String(value || ""));
+  writeAuditLog(null, Session.getActiveUser().getEmail(), "SECRET_CONFIG_UPDATED", "SUCCESS", "SecurityUtils", { key: key });
+  return formatSuccessResponse({ key: key }, "Konfigurasi berhasil disimpan di Script Properties.");
+}
+
+/**
+ * Menyimpan Token Fonnte API secara aman
+ * @param {string} token
+ * @returns {object}
  */
 function setFonnteToken(token) {
-  // Hanya role ADMINISTRATOR yang boleh memanggil ini
-  enforceAdminRole_();
-  PropertiesService.getScriptProperties().setProperty("FONNTE_TOKEN", token);
-  return "Token Fonnte berhasil disimpan di Script Properties terenkripsi.";
+  return setScriptSecret_("FONNTE_TOKEN", token);
 }
 
 /**
- * Enforcement Least Privilege Access Control
+ * Menyimpan Spreadsheet ID secara terpusat
+ * @param {string} spreadsheetId
+ * @returns {object}
+ */
+function setSpreadsheetId(spreadsheetId) {
+  return setScriptSecret_("SPREADSHEET_ID", spreadsheetId);
+}
+
+// ==========================================
+// 2. INPUT VALIDATION & SANITIZATION
+// ==========================================
+
+/**
+ * Sanitasi string untuk mencegah serangan XSS dan injeksi karakter HTML
+ * @param {*} input
+ * @returns {string}
+ */
+function sanitizeString(input) {
+  if (input === null || input === undefined) return "";
+  if (typeof input !== "string") input = String(input);
+  return input.trim()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/\//g, "&#x2F;");
+}
+
+/**
+ * Sanitasi mendalam untuk tipe data primitif, array, maupun objek
+ * @param {*} data
+ * @returns {*}
+ */
+function sanitizeInput(data) {
+  if (data === null || data === undefined) return data;
+  if (typeof data === "string") return sanitizeString(data);
+  if (typeof data === "number" || typeof data === "boolean") return data;
+  if (Array.isArray(data)) {
+    return data.map(function(item) { return sanitizeInput(item); });
+  }
+  if (typeof data === "object") {
+    var cleanObj = {};
+    for (var key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        var cleanKey = sanitizeString(key);
+        cleanObj[cleanKey] = sanitizeInput(data[key]);
+      }
+    }
+    return cleanObj;
+  }
+  return data;
+}
+
+/**
+ * Validasi format email
+ * @param {string} email
+ * @returns {boolean}
+ */
+function isValidEmail(email) {
+  if (!email || typeof email !== "string") return false;
+  var emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return emailRegex.test(email.trim());
+}
+
+/**
+ * Validasi format username (alphanumeric, underscore, dash, min 3 max 30)
+ * @param {string} username
+ * @returns {boolean}
+ */
+function isValidUsername(username) {
+  if (!username || typeof username !== "string") return false;
+  var usernameRegex = /^[a-zA-Z0-9_-]{3,30}$/;
+  return usernameRegex.test(username.trim());
+}
+
+/**
+ * Validasi parameter wajib (Non-empty check)
+ * @param {*} value
+ * @param {string} fieldName
+ */
+function validateRequired(value, fieldName) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    throw new Error("Parameter '" + (fieldName || "input") + "' wajib diisi.");
+  }
+}
+
+// ==========================================
+// 3. AUTHORIZATION & RBAC ENFORCEMENT
+// ==========================================
+
+/**
+ * Mendapatkan email pengguna aktif saat ini dari Google Session
+ * @returns {string}
+ */
+function getCurrentUserEmail_() {
+  try {
+    return Session.getActiveUser().getEmail() || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/**
+ * Mengambil profil hak akses user yang sedang login
+ * @param {string} [email]
+ * @returns {object|null}
+ */
+function getCurrentUserProfile_(email) {
+  var targetEmail = email || getCurrentUserEmail_();
+  if (!targetEmail) return null;
+  return UserRepository.findByEmail(targetEmail);
+}
+
+/**
+ * Memastikan user yang memanggil memiliki peran ADMINISTRATOR
  */
 function enforceAdminRole_() {
-  var activeEmail = Session.getActiveUser().getEmail();
-  var ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET.ID);
-  var sheet = ss.getSheetByName(CONFIG.SPREADSHEET.SHEETS.USER_ROLES);
-  if (!sheet) throw new Error("Akses Ditolak: Modul otorisasi tidak siap.");
-
-  var data = sheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    // data[i][1] -> email, data[i][5] -> role_name, data[i][9] -> is_active
-    if (data[i][1] === activeEmail && data[i][5] === "ADMINISTRATOR" && (data[i][9] === true || data[i][9] === "TRUE")) {
-      return true; // Authorized
-    }
-  }
-
-  writeAuditLog(null, activeEmail, "UNAUTHORIZED_ACCESS_ATTEMPT", "WARNING", "SecurityUtils", {});
-  throw new Error("Akses Ditolak: Anda tidak memiliki hak akses ADMINISTRATOR.");
+  return enforceRoles_([CONFIG.ROLES.ADMINISTRATOR]);
 }
 
 /**
- * Safe Error Handler Response untuk Web App HTML (OWASP API Security)
+ * Memastikan user memiliki salah satu peran yang diizinkan (Least Privilege)
+ * @param {string[]} allowedRoles
  */
-function safeWebResponse(callbackFn) {
+function enforceRoles_(allowedRoles) {
+  var activeEmail = getCurrentUserEmail_();
+  if (!activeEmail) {
+    writeAuditLog(null, "ANONYMOUS", "ACCESS_DENIED", "FAILURE", "SecurityUtils", { reason: "No active session email" });
+    throw new Error("Akses Ditolak: Sesi pengguna Google Workspace tidak terdeteksi.");
+  }
+
+  var user = UserRepository.findByEmail(activeEmail);
+  if (!user || !user.isActive) {
+    writeAuditLog(user ? user.userId : null, activeEmail, "ACCESS_DENIED", "FAILURE", "SecurityUtils", { reason: "User not active or not registered" });
+    throw new Error("Akses Ditolak: Akun Anda tidak aktif atau belum terdaftar.");
+  }
+
+  if (allowedRoles.indexOf(user.roleName) === -1) {
+    writeAuditLog(user.userId, activeEmail, "ACCESS_DENIED_ROLE", "WARNING", "SecurityUtils", { 
+      userRole: user.roleName, 
+      requiredRoles: allowedRoles 
+    });
+    throw new Error("Akses Ditolak: Anda tidak memiliki wewenang untuk menjalankan aksi ini.");
+  }
+
+  return user;
+}
+
+// ==========================================
+// 4. STANDARDIZED RESPONSE & ERROR HANDLING
+// ==========================================
+
+/**
+ * Format standar response sukses
+ * @param {*} data
+ * @param {string} [message]
+ * @returns {object}
+ */
+function formatSuccessResponse(data, message) {
+  return {
+    success: true,
+    data: data || null,
+    message: message || "Operasi berhasil."
+  };
+}
+
+/**
+ * Format standar response error
+ * @param {string|Error} error
+ * @param {string} [code]
+ * @returns {object}
+ */
+function formatErrorResponse(error, code) {
+  var message = (error instanceof Error) ? error.message : String(error || "Terjadi kesalahan sistem.");
+  return {
+    success: false,
+    error: {
+      code: code || CONFIG.ERROR_CODES.INTERNAL_ERROR,
+      message: message
+    }
+  };
+}
+
+/**
+ * Wrapper eksekusi aman untuk seluruh API Backend Web App (OWASP API Security)
+ * Menangkap exception, mencatat log, dan mengembalikan response terstandarisasi.
+ * @param {Function} callbackFn
+ * @param {string} [contextName]
+ * @returns {object}
+ */
+function safeWebResponse(callbackFn, contextName) {
   try {
-    return callbackFn();
+    var result = callbackFn();
+    // Jika result sudah berformat standar, kembalikan langsung
+    if (result && typeof result === "object" && typeof result.success === "boolean") {
+      return result;
+    }
+    return formatSuccessResponse(result);
   } catch (err) {
-    console.error("[SERVER_ERROR]", err.stack || err.message);
-    // Kembalikan pesan aman tanpa membocorkan stack trace internal GAS
-    return {
-      success: false,
-      error: err.message || "Terjadi kesalahan internal pada sistem. Hubungi administrator."
-    };
+    var context = contextName || "API_HANDLER";
+    console.error("[" + context + "_ERROR]", err.stack || err.message);
+    
+    // Tentukan kode error yang sesuai jika pesan spesifik
+    var errorCode = CONFIG.ERROR_CODES.INTERNAL_ERROR;
+    var msg = err.message || "Terjadi kesalahan internal pada sistem.";
+    
+    if (msg.indexOf("Akses Ditolak") !== -1) {
+      errorCode = CONFIG.ERROR_CODES.FORBIDDEN;
+    } else if (msg.indexOf("Kredensial") !== -1 || msg.indexOf("terkunci") !== -1) {
+      errorCode = CONFIG.ERROR_CODES.UNAUTHORIZED;
+    } else if (msg.indexOf("wajib diisi") !== -1 || msg.indexOf("Password") !== -1) {
+      errorCode = CONFIG.ERROR_CODES.INVALID_INPUT;
+    }
+
+    return formatErrorResponse(msg, errorCode);
   }
 }

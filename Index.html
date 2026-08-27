@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Reminder 2 - Security Baseline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <?!= include('style'); ?>
+</head>
+<body>
+  <!-- Decorative Glow -->
+  <div class="bg-glow"></div>
+  <div class="bg-glow-secondary"></div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="app-container">
+    <!-- Header Branding -->
+    <div class="brand-header">
+      <div class="brand-icon">🛡️</div>
+      <h1 class="brand-title">System Reminder 2</h1>
+      <p class="brand-subtitle">Automated Project Tracking & Multi-Channel Reminder</p>
+      <div class="security-badge-header">
+        <span>🔒</span> POL.ISMS.001 Baseline Security
+      </div>
+    </div>
+
+    <!-- 1. LOGIN CARD -->
+    <div class="card" id="loginCard">
+      <div class="card-header">
+        <h2 class="card-title">Masuk ke Sistem</h2>
+        <p class="card-desc">Gunakan kredensial akun Google Workspace atau akun sistem Anda.</p>
+      </div>
+
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="loginIdentifier">Email / Username</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="text" id="loginIdentifier" class="form-input" placeholder="nama@perusahaan.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password / PIN</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔑</span>
+            <input type="password" id="loginPassword" class="form-input" placeholder="••••••••••••" required>
+            <button type="button" class="toggle-password" title="Lihat/Sembunyikan password">🔒</button>
+          </div>
+        </div>
+
+        <!-- Hidden MFA Token Field -->
+        <div class="form-group hidden" id="mfaGroup">
+          <label class="form-label" for="totpToken">Kode Verifikasi 2-Langkah (MFA)</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🛡️</span>
+            <input type="text" id="totpToken" class="form-input" placeholder="6-digit kode verifikasi">
+          </div>
+        </div>
+
+        <button type="submit" id="loginBtn" class="btn btn-primary">
+          <span>Masuk ke Sistem</span>
+        </button>
+      </form>
+
+      <!-- Security Controls Summary -->
+      <div class="security-footer">
+        <div class="sec-feature-card">
+          <span class="icon">🔐</span>
+          <span>Salted SHA-256 Hashing</span>
+        </div>
+        <div class="sec-feature-card">
+          <span class="icon">🚫</span>
+          <span>Lockout Protection 10x</span>
+        </div>
+        <div class="sec-feature-card">
+          <span class="icon">📜</span>
+          <span>Audit Log Masking</span>
+        </div>
+        <div class="sec-feature-card">
+          <span class="icon">👥</span>
+          <span>RBAC Least Privilege</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. FORCE INITIAL PASSWORD CHANGE CARD -->
+    <div class="card hidden" id="changePasswordCard">
+      <div class="card-header">
+        <h2 class="card-title">Perbarui Password Default</h2>
+        <p class="card-desc">Sesuai kebijakan POL.ISMS.001, Anda diwajibkan mengganti password sementara pada login pertama.</p>
+      </div>
+
+      <form id="changePasswordForm">
+        <div class="form-group">
+          <label class="form-label" for="oldPassword">Password Lama (Default)</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="oldPassword" class="form-input" placeholder="••••••••••••" required>
+            <button type="button" class="toggle-password">🔒</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="newPassword">Password Baru</label>
+          <div class="input-wrapper">
+            <span class="input-icon">✨</span>
+            <input type="password" id="newPassword" class="form-input" placeholder="Buat password baru yang kuat" required>
+            <button type="button" class="toggle-password">🔒</button>
+          </div>
+        </div>
+
+        <!-- Live Password Policy Box -->
+        <div class="policy-box">
+          <div class="policy-title">Ketentuan Kebijakan Keamanan:</div>
+          <div class="policy-item" id="ruleLength">
+            <span class="policy-dot"></span>
+            <span class="text">Minimal 8 / 14 karakter</span>
+          </div>
+          <div class="policy-item" id="ruleUpper">
+            <span class="policy-dot"></span>
+            <span class="text">Mengandung huruf besar (A-Z)</span>
+          </div>
+          <div class="policy-item" id="ruleLower">
+            <span class="policy-dot"></span>
+            <span class="text">Mengandung huruf kecil (a-z)</span>
+          </div>
+          <div class="policy-item" id="ruleNumber">
+            <span class="policy-dot"></span>
+            <span class="text">Mengandung angka (0-9)</span>
+          </div>
+          <div class="policy-item" id="ruleSpecial">
+            <span class="policy-dot"></span>
+            <span class="text">Mengandung karakter khusus (!@#$%^&* dll)</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label" for="confirmPassword">Konfirmasi Password Baru</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔄</span>
+            <input type="password" id="confirmPassword" class="form-input" placeholder="Ketik ulang password baru" required>
+            <button type="button" class="toggle-password">🔒</button>
+          </div>
+        </div>
+
+        <button type="submit" id="changePasswordBtn" class="btn btn-primary">
+          <span>Simpan & Perbarui Password</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- 3. AUTHENTICATED WELCOME / DASHBOARD PLACEHOLDER CARD -->
+    <div class="card hidden" id="dashboardCard">
+      <div class="card-header">
+        <h2 class="card-title">Otentikasi Berhasil 🎉</h2>
+        <p class="card-desc">Sesi Anda telah divalidasi dan dicatat di jejak audit (Audit Trail).</p>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Akun Terverifikasi:</div>
+        <div id="userEmailDisplay" style="font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 12px;"></div>
+        
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Peran (Role):</div>
+        <div id="userRoleDisplay" style="font-size: 13px; font-weight: 600; color: #34d399; display: inline-block; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px;"></div>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
+        Fondasi Security Baseline Control <strong>(POL.ISMS.001)</strong> telah aktif melindungi sistem. Fitur berikutnya pada Milestone v0.1 Foundation dapat dibangun di atas layer keamanan ini.
+      </p>
+
+      <button type="button" onclick="logoutUser()" class="btn" style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185;">
+        <span>Keluar (Logout)</span>
+      </button>
+    </div>
+  </div>
+
+  <?!= include('script'); ?>
+</body>
+</html>
