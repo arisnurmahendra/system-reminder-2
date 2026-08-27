@@ -14,7 +14,7 @@ var EmailHelper = {
    */
   sendEmail: function(recipientEmail, subject, htmlBody, plainText) {
     if (!recipientEmail || !isValidEmail(recipientEmail)) {
-      console.warn("[EmailHelper] Email penerima tidak valid:", recipientEmail);
+      AppLogger.warn("EmailHelper", "Email penerima tidak valid: " + recipientEmail);
       return false;
     }
 
@@ -31,12 +31,12 @@ var EmailHelper = {
       } else if (typeof MailApp !== "undefined" && MailApp.sendEmail) {
         MailApp.sendEmail(recipientEmail, subject, textBody, options);
       } else {
-        console.log("[EmailHelper_MOCK] Email dikirim ke:", recipientEmail, "| Subjek:", subject);
+        AppLogger.debug("EmailHelper", "Mock email terkirim", { to: recipientEmail, subject: subject });
       }
 
       return true;
     } catch (err) {
-      console.error("[EmailHelper_ERROR] Gagal mengirim email:", err.message);
+      AppLogger.error("EmailHelper", "Gagal mengirim email: " + err.message, err);
       return false;
     }
   }

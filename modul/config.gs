@@ -32,7 +32,7 @@ var CONFIG = {
         try {
           id = SpreadsheetApp.getActiveSpreadsheet().getId();
         } catch (e) {
-          console.warn("SPREADSHEET_ID belum dikonfigurasi di Script Properties.");
+          // Logik fallback
         }
       }
       return id;
@@ -54,6 +54,19 @@ var CONFIG = {
     SALT_LENGTH: 32,
     MFA_STRICT_MODE_KEY: "MFA_STRICT_MODE",
     SESSION_TIMEOUT_MINUTES: 60
+  },
+
+  LOGGING: {
+    ENABLED: true,
+    MIN_LEVEL: "DEBUG", // "DEBUG" | "INFO" | "WARN" | "ERROR"
+    ENABLE_CONSOLE: true,
+    ENABLE_AUDIT_SHEET: true,
+    LEVELS: {
+      DEBUG: 0,
+      INFO: 1,
+      WARN: 2,
+      ERROR: 3
+    }
   },
 
   FONNTE: {

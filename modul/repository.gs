@@ -39,7 +39,7 @@ var SpreadsheetManager = {
 
       return this._spreadsheetCache;
     } catch (err) {
-      console.error("[SpreadsheetManager_ERROR] Gagal membuka Spreadsheet:", err.message);
+      AppLogger.error("SpreadsheetManager", "Gagal membuka Spreadsheet: " + err.message, err);
       throw new Error("Gagal mengakses database spreadsheet: " + err.message);
     }
   },
@@ -74,7 +74,7 @@ var SpreadsheetManager = {
       this._sheetCache[sheetName] = sheet;
       return sheet;
     } catch (err) {
-      console.error("[SpreadsheetManager_ERROR] Gagal mengakses sheet '" + sheetName + "':", err.message);
+      AppLogger.error("SpreadsheetManager", "Gagal mengakses sheet '" + sheetName + "': " + err.message, err);
       throw new Error("Gagal mengakses sheet '" + sheetName + "': " + err.message);
     }
   },
@@ -169,7 +169,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
 
         return results;
       } catch (err) {
-        console.error("[BaseRepo_" + this.sheetName + "_ERROR] findAll:", err.message);
+        AppLogger.error("BaseRepo_" + this.sheetName, "Gagal mengambil data: " + err.message, err);
         throw new Error("Gagal mengambil data dari " + this.sheetName + ": " + err.message);
       }
     },
@@ -238,7 +238,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
         sheet.appendRow(rowData);
         return entity;
       } catch (err) {
-        console.error("[BaseRepo_" + this.sheetName + "_ERROR] insert:", err.message);
+        AppLogger.error("BaseRepo_" + this.sheetName, "Gagal menyimpan data: " + err.message, err);
         throw new Error("Gagal menyimpan data ke " + this.sheetName + ": " + err.message);
       }
     },
@@ -275,7 +275,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
         sheet.getRange(startRow, 1, numRows, numCols).setValues(rowsData);
         return numRows;
       } catch (err) {
-        console.error("[BaseRepo_" + this.sheetName + "_ERROR] insertBatch:", err.message);
+        AppLogger.error("BaseRepo_" + this.sheetName, "Gagal melakukan batch insert: " + err.message, err);
         throw new Error("Gagal melakukan batch insert ke " + this.sheetName + ": " + err.message);
       }
     },
@@ -307,7 +307,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
 
         return true;
       } catch (err) {
-        console.error("[BaseRepo_" + this.sheetName + "_ERROR] updateById:", err.message);
+        AppLogger.error("BaseRepo_" + this.sheetName, "Gagal mengupdate data: " + err.message, err);
         throw new Error("Gagal mengupdate data di " + this.sheetName + ": " + err.message);
       }
     },
@@ -328,7 +328,7 @@ function createBaseRepository(sheetName, schemaHeaders, primaryKey) {
         sheet.deleteRow(existing._rowIndex);
         return true;
       } catch (err) {
-        console.error("[BaseRepo_" + this.sheetName + "_ERROR] deleteById:", err.message);
+        AppLogger.error("BaseRepo_" + this.sheetName, "Gagal menghapus data: " + err.message, err);
         throw new Error("Gagal menghapus data dari " + this.sheetName + ": " + err.message);
       }
     },

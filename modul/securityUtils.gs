@@ -16,7 +16,7 @@ function getScriptSecret_(key) {
   var props = PropertiesService.getScriptProperties();
   var secret = props.getProperty(key);
   if (!secret) {
-    console.warn("Script Property '" + key + "' belum dikonfigurasi.");
+    AppLogger.warn("SecurityUtils", "Script Property '" + key + "' belum dikonfigurasi.");
   }
   return secret;
 }
@@ -248,7 +248,7 @@ function safeWebResponse(callbackFn, contextName) {
     return formatSuccessResponse(result);
   } catch (err) {
     var context = contextName || "API_HANDLER";
-    console.error("[" + context + "_ERROR]", err.stack || err.message);
+    AppLogger.error(context, err.message || "Terjadi kesalahan internal pada sistem.", err);
     
     // Tentukan kode error yang sesuai jika pesan spesifik
     var errorCode = CONFIG.ERROR_CODES.INTERNAL_ERROR;

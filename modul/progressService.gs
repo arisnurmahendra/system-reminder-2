@@ -62,7 +62,7 @@ var ProgressService = {
       try {
         NotificationService.sendDelayedAlert(project, actual, planned, deviation);
       } catch (notifErr) {
-        console.warn("Gagal mengirim notifikasi keterlambatan otomatis:", notifErr.message);
+        AppLogger.warn("ProgressService", "Gagal mengirim notifikasi keterlambatan otomatis: " + notifErr.message);
       }
     }
 

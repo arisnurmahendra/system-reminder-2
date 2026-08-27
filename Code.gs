@@ -10,7 +10,7 @@ function doGet(e) {
   try {
     SpreadsheetManager.initializeAllSheets();
   } catch (err) {
-    console.error("Gagal melakukan inisialisasi database di doGet:", err);
+    AppLogger.error("Code.gs", "Gagal melakukan inisialisasi database di doGet: " + err.message, err);
   }
 
   var template = HtmlService.createTemplateFromFile("Index");
@@ -153,6 +153,6 @@ function scheduledDailyJob() {
   try {
     NotificationService.checkAndSendDailyReminders();
   } catch (e) {
-    console.error("[SCHEDULED_JOB_ERROR]", e.message);
+    AppLogger.error("Code.gs", "Kesalahan eksekusi scheduledDailyJob: " + e.message, e);
   }
 }

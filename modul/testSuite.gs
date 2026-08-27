@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, & Service Layer
+ * Unit Test & Verification Suite untuk Security, Repository, Service, & Logging Framework
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -228,7 +228,7 @@ function runAllServiceTests() {
   assert("Progress Engine S-Curve Midpoint is 50%", Math.round(pScurveMid) === 50, "S-Curve midpoint error: " + pScurveMid);
 
   // 3. Test Progress Engine Deviation & Status
-  var dev1 = ProgressEngine.calculateDeviation(30, 45); // -15%
+  var dev1 = ProgressEngine.calculateDeviation(30, 45);
   var statusDelayed = ProgressEngine.determineProgressStatus(30, 45);
   var statusAhead = ProgressEngine.determineProgressStatus(60, 45);
   var statusCompleted = ProgressEngine.determineProgressStatus(100, 100);
@@ -299,6 +299,83 @@ function runAllServiceTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN SERVICE: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllLoggingTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST LOGGING FRAMEWORK ===");
+
+  // 1. Test AppLogger Object Existence
+  assert(
+    "AppLogger Object Defined with Required Methods",
+    typeof AppLogger === "object" &&
+    typeof AppLogger.debug === "function" &&
+    typeof AppLogger.info === "function" &&
+    typeof AppLogger.warn === "function" &&
+    typeof AppLogger.error === "function" &&
+    typeof AppLogger.audit === "function",
+    "AppLogger interface invalid"
+  );
+
+  // 2. Test Level Filtering Logic
+  CONFIG.LOGGING.MIN_LEVEL = "WARN";
+  assert("AppLogger shouldLog DEBUG is False when MIN_LEVEL is WARN", AppLogger.shouldLog("DEBUG") === false, "Level filtering failed");
+  assert("AppLogger shouldLog INFO is False when MIN_LEVEL is WARN", AppLogger.shouldLog("INFO") === false, "Level filtering failed");
+  assert("AppLogger shouldLog WARN is True when MIN_LEVEL is WARN", AppLogger.shouldLog("WARN") === true, "Level filtering failed");
+  assert("AppLogger shouldLog ERROR is True when MIN_LEVEL is WARN", AppLogger.shouldLog("ERROR") === true, "Level filtering failed");
+
+  // Kembalikan ke DEBUG
+  CONFIG.LOGGING.MIN_LEVEL = "DEBUG";
+
+  // 3. Test Global Enable/Disable Toggle
+  CONFIG.LOGGING.ENABLED = false;
+  assert("AppLogger shouldLog Returns False when LOGGING.ENABLED is False", AppLogger.shouldLog("ERROR") === false, "Global toggle failed");
+  CONFIG.LOGGING.ENABLED = true;
+
+  // 4. Test Log Entry Formatting Structure
+  var entry = AppLogger.formatEntry_("INFO", "TestModule", "Test Message", { key: "value", password: "SecretPassword123" }, "tester@perusahaan.com");
+  assert("Log Entry Format Valid", 
+    entry.level === "INFO" && 
+    entry.module === "TestModule" && 
+    entry.user === "tester@perusahaan.com" && 
+    entry.message === "Test Message" &&
+    entry.data.key === "value" &&
+    entry.data.password === "[REDACTED]", 
+    "Log format or masking failed: " + JSON.stringify(entry)
+  );
+
+  // 5. Test Error Object Serialization
+  var testErr = new Error("Sample Test Error");
+  var errEntry = AppLogger.formatEntry_("ERROR", "ErrorModule", "Error happened", testErr);
+  assert("Error Object Serialized with Message & Name", 
+    errEntry.data && errEntry.data.name === "Error" && errEntry.data.message === "Sample Test Error",
+    "Error serialization failed"
+  );
+
+  // 6. Test Audit Logging Dispatch
+  AppLogger.audit("AuthService", "TEST_AUDIT_ACTION", "SUCCESS", { token: "sensitive_token_123", count: 5 });
+  assert("AppLogger.audit Executes Without Error", true, "Audit execution failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN LOGGING: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

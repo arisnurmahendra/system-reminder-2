@@ -13,16 +13,15 @@ var FonnteHelper = {
   sendMessage: function(targetPhone, messageText) {
     var token = CONFIG.FONNTE.API_TOKEN;
     if (!token) {
-      console.warn("[FonnteHelper] Token FONNTE_TOKEN belum dikonfigurasi di Script Properties.");
+      AppLogger.warn("FonnteHelper", "Token FONNTE_TOKEN belum dikonfigurasi di Script Properties.");
       return false;
     }
 
     if (!targetPhone || !messageText) {
-      console.warn("[FonnteHelper] Nomor target atau isi pesan kosong.");
+      AppLogger.warn("FonnteHelper", "Nomor target atau isi pesan kosong.");
       return false;
     }
 
-    // Format nomor target (hilangkan spasi, strip, dll.)
     var cleanPhone = String(targetPhone).replace(/[^0-9]/g, "");
 
     try {
@@ -46,17 +45,18 @@ var FonnteHelper = {
         var resText = response.getContentText();
 
         if (resCode >= 200 && resCode < 300) {
+          AppLogger.debug("FonnteHelper", "Pesan WA berhasil terkirim ke " + cleanPhone);
           return true;
         } else {
-          console.error("[FonnteHelper_ERROR] HTTP " + resCode + ": " + resText);
+          AppLogger.error("FonnteHelper", "Gagal kirim WA (HTTP " + resCode + ")", { response: resText });
           return false;
         }
       } else {
-        console.log("[FonnteHelper_MOCK] WA dikirim ke:", cleanPhone, "| Pesan:", messageText);
+        AppLogger.debug("FonnteHelper", "Mock WA terkirim", { to: cleanPhone, message: messageText });
         return true;
       }
     } catch (err) {
-      console.error("[FonnteHelper_ERROR] Gagal mengirim pesan WA:", err.message);
+      AppLogger.error("FonnteHelper", "Gagal mengirim pesan WA: " + err.message, err);
       return false;
     }
   }
