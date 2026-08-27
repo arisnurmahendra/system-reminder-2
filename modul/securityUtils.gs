@@ -248,20 +248,10 @@ function safeWebResponse(callbackFn, contextName) {
     return formatSuccessResponse(result);
   } catch (err) {
     var context = contextName || "API_HANDLER";
-    AppLogger.error(context, err.message || "Terjadi kesalahan internal pada sistem.", err);
-    
-    // Tentukan kode error yang sesuai jika pesan spesifik
-    var errorCode = CONFIG.ERROR_CODES.INTERNAL_ERROR;
-    var msg = err.message || "Terjadi kesalahan internal pada sistem.";
-    
-    if (msg.indexOf("Akses Ditolak") !== -1) {
-      errorCode = CONFIG.ERROR_CODES.FORBIDDEN;
-    } else if (msg.indexOf("Kredensial") !== -1 || msg.indexOf("terkunci") !== -1) {
-      errorCode = CONFIG.ERROR_CODES.UNAUTHORIZED;
-    } else if (msg.indexOf("wajib diisi") !== -1 || msg.indexOf("Password") !== -1) {
-      errorCode = CONFIG.ERROR_CODES.INVALID_INPUT;
+    if (typeof ErrorHandler !== "undefined" && ErrorHandler.handle) {
+      return ErrorHandler.handle(err, context);
     }
-
-    return formatErrorResponse(msg, errorCode);
+    AppLogger.error(context, err.message || "Terjadi kesalahan internal pada sistem.", err);
+    return formatErrorResponse(err.message || "Terjadi kesalahan internal.", CONFIG.ERROR_CODES.SYS_INTERNAL_ERROR);
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, & Logging Framework
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, & Error Handling
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -101,10 +101,10 @@ function runAllSecurityTests() {
     "Success response format invalid"
   );
 
-  var errorResp = formatErrorResponse("Contoh error", CONFIG.ERROR_CODES.UNAUTHORIZED);
+  var errorResp = formatErrorResponse("Contoh error", CONFIG.ERROR_CODES.AUTH_UNAUTHORIZED);
   assert(
     "Error Response Standard Format",
-    errorResp.success === false && errorResp.error.code === CONFIG.ERROR_CODES.UNAUTHORIZED,
+    errorResp.success === false && errorResp.error.code === CONFIG.ERROR_CODES.AUTH_UNAUTHORIZED,
     "Error response format invalid"
   );
 
@@ -376,6 +376,86 @@ function runAllLoggingTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN LOGGING: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllErrorHandlingTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST ERROR HANDLING FRAMEWORK ===");
+
+  // 1. Test AppError Instantiation
+  var customErr = new AppError("Test message", CONFIG.ERROR_CODES.VAL_INVALID_INPUT, CONFIG.ERROR_CATEGORIES.VALIDATION, { field: "email" });
+  assert("AppError Instance Properties Correct", 
+    customErr.name === "AppError" && 
+    customErr.code === CONFIG.ERROR_CODES.VAL_INVALID_INPUT && 
+    customErr.category === CONFIG.ERROR_CATEGORIES.VALIDATION && 
+    customErr.details.field === "email" &&
+    Boolean(customErr.timestamp),
+    "AppError structure failed"
+  );
+
+  // 2. Test ErrorFactory Methods
+  var valErr = ErrorFactory.validation("Format salah", { item: 1 });
+  var authErr = ErrorFactory.auth("Akses ditolak", true);
+  var notFoundErr = ErrorFactory.notFound("Proyek", "prj_123");
+  var bizErr = ErrorFactory.businessRule("Proyek sudah selesai");
+
+  assert("ErrorFactory Validation Error Created", valErr.category === CONFIG.ERROR_CATEGORIES.VALIDATION, "Factory validation failed");
+  assert("ErrorFactory Auth Forbidden Error Created", authErr.code === CONFIG.ERROR_CODES.AUTH_FORBIDDEN, "Factory auth failed");
+  assert("ErrorFactory NotFound Error Created", notFoundErr.code === CONFIG.ERROR_CODES.DB_NOT_FOUND, "Factory notFound failed");
+  assert("ErrorFactory BusinessRule Error Created", bizErr.category === CONFIG.ERROR_CATEGORIES.BUSINESS_RULE, "Factory businessRule failed");
+
+  // 3. Test ErrorHandler Normalization
+  var rawError = new Error("Kredensial login tidak valid.");
+  var normalizedRaw = ErrorHandler.normalize(rawError);
+  assert("Raw Error Normalized to AUTH_UNAUTHORIZED", normalizedRaw.code === CONFIG.ERROR_CODES.AUTH_UNAUTHORIZED, "Normalization failed: " + normalizedRaw.code);
+
+  var customNormalized = ErrorHandler.normalize(valErr);
+  assert("AppError Passes Through Normalization Unchanged", customNormalized === valErr, "Normalization modified AppError");
+
+  // 4. Test ErrorHandler Handle Output Structure
+  var clientResponse = ErrorHandler.handle(valErr, "TestContext");
+  assert("ErrorHandler Handle Produces Client Safe Response", 
+    clientResponse.success === false && 
+    clientResponse.error && 
+    clientResponse.error.code === CONFIG.ERROR_CODES.VAL_INVALID_INPUT && 
+    clientResponse.error.category === CONFIG.ERROR_CATEGORIES.VALIDATION && 
+    clientResponse.error.message === "Format salah" &&
+    clientResponse.error.stack === undefined, 
+    "Client response leaked stack or had wrong structure"
+  );
+
+  // 5. Test safeWebResponse Integration
+  var safeRes = safeWebResponse(function() {
+    throw ErrorFactory.validation("Nilai tidak valid");
+  }, "API_TEST");
+
+  assert("safeWebResponse Uses ErrorHandler", 
+    safeRes.success === false && 
+    safeRes.error.code === CONFIG.ERROR_CODES.VAL_INVALID_INPUT &&
+    safeRes.error.category === CONFIG.ERROR_CATEGORIES.VALIDATION,
+    "safeWebResponse integration failed"
+  );
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN ERROR HANDLING: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
