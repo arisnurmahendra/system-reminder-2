@@ -182,6 +182,27 @@ function apiGetProjectCurveData(projectId, curveType) {
   }, "apiGetProjectCurveData");
 }
 
+function apiGetProjectTimeline(projectId, options) {
+  return safeWebResponse(function() {
+    var cleanId = sanitizeString(projectId);
+    var project = ProjectRepository.findById(cleanId);
+    if (!project) {
+      throw ErrorFactory.notFound("Proyek", cleanId);
+    }
+
+    var timeline = ScheduleEngine.generateScheduleTimeline(project.start_date, project.end_date, options);
+    var phase = ScheduleEngine.getSchedulePhase(project.start_date, project.end_date);
+    var totalWorkingDays = ScheduleEngine.calculateWorkingDays(project.start_date, project.end_date);
+
+    return {
+      project: project,
+      phase: phase,
+      totalWorkingDays: totalWorkingDays,
+      timeline: timeline
+    };
+  }, "apiGetProjectTimeline");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================

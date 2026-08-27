@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, & Daily Progress Management
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, Progress Engine, Project Management, Daily Progress Management, & Schedule Engine
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -765,6 +765,61 @@ function runAllDailyProgressManagementTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN DAILY PROGRESS MANAGEMENT: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllScheduleEngineTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST SCHEDULE ENGINE ===");
+
+  // 1. Test Working Days (Exclude Weekends)
+  // 2026-01-05 (Senin) s.d. 2026-01-11 (Minggu) -> 5 hari kerja (Sen-Jum), 2 hari libur
+  var wDays = ScheduleEngine.calculateWorkingDays("2026-01-05", "2026-01-11");
+  assert("Working Days Calculation Excludes Weekend (5 days)", wDays === 5, "Working days error: " + wDays);
+
+  // 2. Test Working Days with Custom Holidays
+  var wDaysHoliday = ScheduleEngine.calculateWorkingDays("2026-01-05", "2026-01-11", ["2026-01-07"]);
+  assert("Working Days Calculation Excludes Custom Holiday (4 days)", wDaysHoliday === 4, "Holiday working days error: " + wDaysHoliday);
+
+  // 3. Test Elapsed & Remaining Working Days
+  var elapsedWork = ScheduleEngine.calculateElapsedWorkingDays("2026-01-05", "2026-01-08");
+  var remainingWork = ScheduleEngine.calculateRemainingWorkingDays("2026-01-11", "2026-01-08");
+  assert("Elapsed Working Days (4 days)", elapsedWork === 4, "Elapsed error: " + elapsedWork);
+  assert("Remaining Working Days (1 day)", remainingWork === 1, "Remaining error: " + remainingWork);
+
+  // 4. Test Schedule Phase Determination
+  var phaseNotStarted = ScheduleEngine.getSchedulePhase("2026-06-01", "2026-12-31", "2026-01-01");
+  var phaseInProgress = ScheduleEngine.getSchedulePhase("2026-01-01", "2026-12-31", "2026-06-15");
+  var phaseOverdue = ScheduleEngine.getSchedulePhase("2026-01-01", "2026-06-01", "2026-08-01");
+
+  assert("Schedule Phase NOT_STARTED", phaseNotStarted === "NOT_STARTED", "Phase NOT_STARTED error");
+  assert("Schedule Phase IN_PROGRESS", phaseInProgress === "IN_PROGRESS", "Phase IN_PROGRESS error");
+  assert("Schedule Phase OVERDUE", phaseOverdue === "OVERDUE", "Phase OVERDUE error");
+
+  // 5. Test Generate Schedule Timeline
+  var timeline = ScheduleEngine.generateScheduleTimeline("2026-01-05", "2026-01-11", { workingDaysOnly: true });
+  assert("Generated Schedule Timeline Length (7 days)", timeline.length === 7, "Timeline length error: " + timeline.length);
+  assert("Schedule Timeline Ends at 100% Cumulative Progress", timeline[6].cumulativePlanned === 100, "Cumulative end error");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN SCHEDULE ENGINE: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
