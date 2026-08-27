@@ -1,6 +1,6 @@
 /**
  * Entry Point Utama Web App & Routing Google Apps Script
- * Mengikuti standar keamanan Baseline Control POL.ISMS.001
+ * Mengikuti standar arsitektur Layer Architecture & Baseline Control POL.ISMS.001
  */
 
 /**
@@ -8,7 +8,7 @@
  */
 function doGet(e) {
   try {
-    initializeDatabase();
+    SpreadsheetManager.initializeAllSheets();
   } catch (err) {
     console.error("Gagal melakukan inisialisasi database di doGet:", err);
   }
@@ -21,7 +21,7 @@ function doGet(e) {
 
   return template
     .evaluate()
-    .setTitle(CONFIG.APP.NAME + " — Security Baseline")
+    .setTitle(CONFIG.APP.NAME + " — Dashboard & Reminder")
     .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
     .setSandboxMode(HtmlService.SandboxMode.IFRAME)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
@@ -37,47 +37,33 @@ function include(filename) {
 }
 
 // ==========================================
-// EXPOSED SECURE WEB API ENDPOINTS
+// 1. AUTHENTICATION & SESSION ENDPOINTS
 // ==========================================
 
-/**
- * API Otentikasi Login Pengguna
- */
 function apiLogin(identifier, password, totpToken) {
   return safeWebResponse(function() {
     var cleanIdentifier = sanitizeString(identifier);
     var cleanPassword = String(password || "");
     var cleanTotp = sanitizeString(totpToken);
-
     return processUserLogin(cleanIdentifier, cleanPassword, cleanTotp);
   }, "apiLogin");
 }
 
-/**
- * API Penggantian Password Default (Login Pertama)
- */
 function apiChangeInitialPassword(userId, oldPassword, newPassword) {
   return safeWebResponse(function() {
     var cleanUserId = sanitizeString(userId);
     var cleanOldPassword = String(oldPassword || "");
     var cleanNewPassword = String(newPassword || "");
-
     return processInitialPasswordChange(cleanUserId, cleanOldPassword, cleanNewPassword);
   }, "apiChangeInitialPassword");
 }
 
-/**
- * API Pengecekan Status Sesi Aktif
- */
 function apiCheckSession() {
   return safeWebResponse(function() {
     return getActiveSessionStatus();
   }, "apiCheckSession");
 }
 
-/**
- * API Metadata Sistem Umum
- */
 function apiGetSystemMetadata() {
   return safeWebResponse(function() {
     return {
@@ -88,22 +74,85 @@ function apiGetSystemMetadata() {
   }, "apiGetSystemMetadata");
 }
 
-/**
- * API Penyimpanan Token Fonnte (Khusus Role Administrator)
- */
-function apiSetFonnteToken(token) {
+// ==========================================
+// 2. PROJECT SERVICE ENDPOINTS
+// ==========================================
+
+function apiRegisterProject(payload) {
   return safeWebResponse(function() {
-    var cleanToken = sanitizeString(token);
-    return setFonnteToken(cleanToken);
-  }, "apiSetFonnteToken");
+    return ProjectService.registerProject(payload);
+  }, "apiRegisterProject");
+}
+
+function apiGetProjectById(projectId) {
+  return safeWebResponse(function() {
+    return ProjectService.getProjectById(sanitizeString(projectId));
+  }, "apiGetProjectById");
+}
+
+function apiGetAllProjects(filter) {
+  return safeWebResponse(function() {
+    return ProjectService.getAllProjects(filter);
+  }, "apiGetAllProjects");
+}
+
+function apiUpdateProject(projectId, updates) {
+  return safeWebResponse(function() {
+    return ProjectService.updateProject(sanitizeString(projectId), updates);
+  }, "apiUpdateProject");
+}
+
+function apiToggleProjectNotification(projectId, channelType, isEnabled) {
+  return safeWebResponse(function() {
+    return ProjectService.toggleNotification(sanitizeString(projectId), sanitizeString(channelType), isEnabled);
+  }, "apiToggleProjectNotification");
+}
+
+function apiDeleteProject(projectId) {
+  return safeWebResponse(function() {
+    return ProjectService.deleteProject(sanitizeString(projectId));
+  }, "apiDeleteProject");
+}
+
+// ==========================================
+// 3. PROGRESS SERVICE ENDPOINTS
+// ==========================================
+
+function apiRecordDailyProgress(payload) {
+  return safeWebResponse(function() {
+    return ProgressService.recordDailyProgress(payload);
+  }, "apiRecordDailyProgress");
+}
+
+function apiGetProgressHistory(projectId, order) {
+  return safeWebResponse(function() {
+    return ProgressService.getProgressHistory(sanitizeString(projectId), sanitizeString(order));
+  }, "apiGetProgressHistory");
+}
+
+function apiGetLatestProgress(projectId) {
+  return safeWebResponse(function() {
+    return ProgressService.getLatestProgress(sanitizeString(projectId));
+  }, "apiGetLatestProgress");
+}
+
+// ==========================================
+// 4. NOTIFICATION & TRIGGER ENDPOINTS
+// ==========================================
+
+function apiTriggerDailyReminders() {
+  return safeWebResponse(function() {
+    return NotificationService.checkAndSendDailyReminders();
+  }, "apiTriggerDailyReminders");
 }
 
 /**
- * API Penyimpanan Spreadsheet ID (Khusus Role Administrator)
+ * Trigger terjadwal Google Apps Script (Time-driven trigger)
  */
-function apiSetSpreadsheetId(spreadsheetId) {
-  return safeWebResponse(function() {
-    var cleanId = sanitizeString(spreadsheetId);
-    return setSpreadsheetId(cleanId);
-  }, "apiSetSpreadsheetId");
+function scheduledDailyJob() {
+  try {
+    NotificationService.checkAndSendDailyReminders();
+  } catch (e) {
+    console.error("[SCHEDULED_JOB_ERROR]", e.message);
+  }
 }

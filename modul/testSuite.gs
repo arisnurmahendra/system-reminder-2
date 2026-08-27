@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security Baseline & Repository Layer
+ * Unit Test & Verification Suite untuk Security, Repository, & Service Layer
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -52,7 +52,7 @@ function runAllSecurityTests() {
   // 4. Test Password Policy Validation
   var weakPass = "password";
   var userValidPass = "Secret@2026";
-  var adminShortPass = "Secret@2026"; // 11 chars (admin needs min 14)
+  var adminShortPass = "Secret@2026";
   var adminValidPass = "SuperSecretAdmin#2026!";
 
   assert("Weak Password Rejected", validatePasswordPolicy(weakPass, false).valid === false, "Weak password passed");
@@ -193,6 +193,112 @@ function runAllRepositoryTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN REPOSITORY: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllServiceTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST SERVICE LAYER ===");
+
+  // 1. Test Progress Engine Linear Calculation
+  var p1 = ProgressEngine.calculatePlannedProgress("2026-01-01", "2026-01-10", "2026-01-01");
+  var p5 = ProgressEngine.calculatePlannedProgress("2026-01-01", "2026-01-11", "2026-01-06");
+  var pEnd = ProgressEngine.calculatePlannedProgress("2026-01-01", "2026-01-10", "2026-01-10");
+  assert("Progress Engine Linear Planned Progress (0%, 50%, 100%)", p1 === 0 && p5 === 50 && pEnd === 100, "Progress engine math error");
+
+  // 2. Test Progress Engine S-Curve Calculation
+  var pScurveMid = ProgressEngine.calculatePlannedProgress("2026-01-01", "2026-01-11", "2026-01-06", "SCURVE");
+  assert("Progress Engine S-Curve Midpoint is 50%", Math.round(pScurveMid) === 50, "S-Curve midpoint error: " + pScurveMid);
+
+  // 3. Test Progress Engine Deviation & Status
+  var dev1 = ProgressEngine.calculateDeviation(30, 45); // -15%
+  var statusDelayed = ProgressEngine.determineProgressStatus(30, 45);
+  var statusAhead = ProgressEngine.determineProgressStatus(60, 45);
+  var statusCompleted = ProgressEngine.determineProgressStatus(100, 100);
+
+  assert("Deviation Calculation Correct", dev1 === -15, "Deviation error: " + dev1);
+  assert("Status Determination Correct (DELAYED, AHEAD, COMPLETED)", 
+    statusDelayed === "DELAYED" && statusAhead === "AHEAD" && statusCompleted === "COMPLETED",
+    "Status determination error"
+  );
+
+  // 4. Test Project Service Registration & Validation
+  var projPayload = {
+    projectName: "Proyek Gedung A",
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+    picName: "Budi Santoso",
+    picEmail: "budi@perusahaan.com",
+    picPhone: "081234567890",
+    isEmailActive: true,
+    isWaActive: true
+  };
+
+  var regRes = ProjectService.registerProject(projPayload);
+  assert("Project Registration Succeeded", regRes.success === true && Boolean(regRes.data.projectId), "Project registration failed");
+
+  var projId = regRes.data.projectId;
+
+  // 5. Test Project Service Summary Computation
+  var getRes = ProjectService.getProjectById(projId);
+  assert("Project Get and Summary Computation Works", 
+    getRes.success === true && getRes.data.summary && typeof getRes.data.summary.plannedProgress === "number",
+    "Project get summary failed"
+  );
+
+  // 6. Test Project Notification Toggling
+  var toggleRes = ProjectService.toggleNotification(projId, "wa", false);
+  assert("Toggle Notification Channel Works", toggleRes.success === true && toggleRes.data.enabled === false, "Toggle notification failed");
+
+  // 7. Test Progress Service Daily Recording
+  var progRes = ProgressService.recordDailyProgress({
+    projectId: projId,
+    date: "2026-06-15",
+    actualProgress: 40,
+    notes: "Pengecoran lantai 2 selesai",
+    recordedBy: "admin@perusahaan.com"
+  });
+
+  assert("Progress Recording Succeeded", progRes.success === true && progRes.data.actualProgress === 40, "Progress record failed");
+
+  // 8. Test Progress History & Latest Retrieval
+  var histRes = ProgressService.getProgressHistory(projId);
+  var latestRes = ProgressService.getLatestProgress(projId);
+  assert("Progress History and Latest Progress Work", 
+    histRes.success === true && histRes.data.length === 1 && latestRes.data.actual_progress === 40,
+    "Progress history retrieval failed"
+  );
+
+  // 9. Test Notification Service Alert Dispatching
+  var alertRes = NotificationService.sendDelayedAlert(
+    { project_id: projId, project_name: "Proyek Gedung A", pic_name: "Budi", pic_email: "budi@perusahaan.com", pic_phone: "081234567890", is_email_active: true, is_wa_active: false },
+    30, 50, -20
+  );
+  assert("Notification Service Alert Dispatched", alertRes.emailSent === true && alertRes.waSent === false, "Notification alert failed");
+
+  // 10. Test Notification Service Daily Scheduler Sweep
+  var sweepRes = NotificationService.checkAndSendDailyReminders();
+  assert("Daily Reminder Sweep Executes", sweepRes.success === true && typeof sweepRes.data.totalEvaluated === "number", "Daily sweep failed");
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN SERVICE: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,
