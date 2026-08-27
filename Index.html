@@ -3,21 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System Reminder 2 - Security Baseline</title>
+  <title>System Reminder 2 - Dashboard & Project Tracking</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <?!= include('style'); ?>
 </head>
 <body>
-  <!-- Decorative Glow -->
+  <!-- Background Ambient Glow -->
   <div class="bg-glow"></div>
   <div class="bg-glow-secondary"></div>
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <div class="app-container">
+  <!-- Loading Overlay -->
+  <div class="loading-overlay hidden" id="globalLoading">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Memuat data sistem...</div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 1. AUTHENTICATION SCREENS (LOGIN / CHANGE PASS) -->
+  <!-- ========================================== -->
+  <div class="auth-container" id="authContainer">
     <!-- Header Branding -->
     <div class="brand-header">
       <div class="brand-icon">🛡️</div>
@@ -28,7 +37,7 @@
       </div>
     </div>
 
-    <!-- 1. LOGIN CARD -->
+    <!-- Login Card -->
     <div class="card" id="loginCard">
       <div class="card-header">
         <h2 class="card-title">Masuk ke Sistem</h2>
@@ -71,24 +80,24 @@
       <div class="security-footer">
         <div class="sec-feature-card">
           <span class="icon">🔐</span>
-          <span>Salted SHA-256 Hashing</span>
+          <span>Salted SHA-256</span>
         </div>
         <div class="sec-feature-card">
           <span class="icon">🚫</span>
-          <span>Lockout Protection 10x</span>
+          <span>Lockout Protection</span>
         </div>
         <div class="sec-feature-card">
           <span class="icon">📜</span>
-          <span>Audit Log Masking</span>
+          <span>Audit Masking</span>
         </div>
         <div class="sec-feature-card">
           <span class="icon">👥</span>
-          <span>RBAC Least Privilege</span>
+          <span>RBAC Security</span>
         </div>
       </div>
     </div>
 
-    <!-- 2. FORCE INITIAL PASSWORD CHANGE CARD -->
+    <!-- Force Initial Password Change Card -->
     <div class="card hidden" id="changePasswordCard">
       <div class="card-header">
         <h2 class="card-title">Perbarui Password Default</h2>
@@ -97,7 +106,7 @@
 
       <form id="changePasswordForm">
         <div class="form-group">
-          <label class="form-label" for="oldPassword">Password Lama (Default)</label>
+          <label class="form-label" for="oldPassword">Password Lama</label>
           <div class="input-wrapper">
             <span class="input-icon">🔒</span>
             <input type="password" id="oldPassword" class="form-input" placeholder="••••••••••••" required>
@@ -109,7 +118,7 @@
           <label class="form-label" for="newPassword">Password Baru</label>
           <div class="input-wrapper">
             <span class="input-icon">✨</span>
-            <input type="password" id="newPassword" class="form-input" placeholder="Buat password baru yang kuat" required>
+            <input type="password" id="newPassword" class="form-input" placeholder="Password baru yang kuat" required>
             <button type="button" class="toggle-password">🔒</button>
           </div>
         </div>
@@ -135,7 +144,7 @@
           </div>
           <div class="policy-item" id="ruleSpecial">
             <span class="policy-dot"></span>
-            <span class="text">Mengandung karakter khusus (!@#$%^&* dll)</span>
+            <span class="text">Mengandung karakter khusus (!@#$)</span>
           </div>
         </div>
 
@@ -153,29 +162,394 @@
         </button>
       </form>
     </div>
+  </div>
 
-    <!-- 3. AUTHENTICATED WELCOME / DASHBOARD PLACEHOLDER CARD -->
-    <div class="card hidden" id="dashboardCard">
-      <div class="card-header">
-        <h2 class="card-title">Otentikasi Berhasil 🎉</h2>
-        <p class="card-desc">Sesi Anda telah divalidasi dan dicatat di jejak audit (Audit Trail).</p>
+  <!-- ========================================== -->
+  <!-- 2. MAIN APPLICATION DASHBOARD (AUTHENTICATED) -->
+  <!-- ========================================== -->
+  <div class="dashboard-layout hidden" id="dashboardLayout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-logo-icon">📊</span>
+        <div class="brand-name">
+          <h2>System Reminder 2</h2>
+          <span class="version-tag">v0.2 Core</span>
+        </div>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Akun Terverifikasi:</div>
-        <div id="userEmailDisplay" style="font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 12px;"></div>
+      <nav class="sidebar-nav">
+        <a href="#overview" class="nav-item active" data-tab="overview">
+          <span class="nav-icon">📈</span>
+          <span>Dashboard KPI</span>
+        </a>
+        <a href="#projects" class="nav-item" data-tab="projects">
+          <span class="nav-icon">📁</span>
+          <span>Project Management</span>
+        </a>
+        <a href="#progress" class="nav-item" data-tab="progress">
+          <span class="nav-icon">📅</span>
+          <span>Daily Progress</span>
+        </a>
+        <a href="#settings" class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙️</span>
+          <span>Settings & Channel</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-badge">
+          <div class="user-avatar" id="sidebarAvatar">U</div>
+          <div class="user-info">
+            <div class="user-name" id="sidebarUserName">User</div>
+            <div class="user-role" id="sidebarUserRole">Member</div>
+          </div>
+        </div>
+        <button type="button" class="btn-logout" onclick="logoutUser()" title="Keluar">
+          <span>🚪</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Navigation Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="mobile-menu-btn" id="mobileMenuToggle">☰</button>
+          <h1 class="page-title" id="pageTitle">Dashboard Ringkasan Proyek</h1>
+        </div>
+
+        <div class="topbar-right">
+          <button type="button" class="btn btn-sm btn-outline" onclick="triggerManualSweep()">
+            <span>⚡ Sync & Sweep Reminders</span>
+          </button>
+          <div class="status-indicator-badge">
+            <span class="live-dot"></span> Live GAS Connected
+          </div>
+        </div>
+      </header>
+
+      <!-- View Containers -->
+      <div class="content-body">
         
-        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">Peran (Role):</div>
-        <div id="userRoleDisplay" style="font-size: 13px; font-weight: 600; color: #34d399; display: inline-block; background: rgba(16, 185, 129, 0.15); padding: 4px 10px; border-radius: 6px;"></div>
+        <!-- TAB 1: OVERVIEW & SUMMARY -->
+        <section class="tab-pane active" id="tabOverview">
+          <!-- Summary Metric Cards -->
+          <div class="metric-grid">
+            <div class="metric-card card-glow-blue">
+              <div class="metric-icon">📁</div>
+              <div class="metric-info">
+                <div class="metric-value" id="kpiTotalProjects">0</div>
+                <div class="metric-label">Total Proyek Aktif</div>
+              </div>
+            </div>
+
+            <div class="metric-card card-glow-green">
+              <div class="metric-icon">✅</div>
+              <div class="metric-info">
+                <div class="metric-value" id="kpiOnTrack">0</div>
+                <div class="metric-label">Sesuai Jadwal (On Track)</div>
+              </div>
+            </div>
+
+            <div class="metric-card card-glow-red">
+              <div class="metric-icon">⚠️</div>
+              <div class="metric-info">
+                <div class="metric-value" id="kpiDelayed">0</div>
+                <div class="metric-label">Keterlambatan (Delayed)</div>
+              </div>
+            </div>
+
+            <div class="metric-card card-glow-purple">
+              <div class="metric-icon">🎉</div>
+              <div class="metric-info">
+                <div class="metric-value" id="kpiCompleted">0</div>
+                <div class="metric-label">Proyek Selesai</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Highlight Projects Table -->
+          <div class="panel">
+            <div class="panel-header">
+              <h3 class="panel-title">Ringkasan Status Proyek Terkini</h3>
+              <button type="button" class="btn btn-sm btn-primary" onclick="openCreateProjectModal()">
+                <span>+ Tambah Proyek</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nama Proyek</th>
+                    <th>PIC & Kontak</th>
+                    <th>Periode</th>
+                    <th>Rencana</th>
+                    <th>Aktual</th>
+                    <th>Deviasi</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="overviewProjectTableBody">
+                  <tr><td colspan="8" class="text-center py-4">Memuat data proyek...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: PROJECT MANAGEMENT -->
+        <section class="tab-pane" id="tabProjects">
+          <div class="panel">
+            <div class="panel-header flex-wrap gap-3">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="projectSearchInput" placeholder="Cari nama proyek, PIC, email..." oninput="handleProjectSearch(this.value)">
+              </div>
+
+              <div class="filter-actions flex-wrap gap-2">
+                <select id="projectStatusFilter" class="form-select" onchange="loadProjects()">
+                  <option value="">Semua Status</option>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                  <option value="ARCHIVED">ARCHIVED</option>
+                </select>
+
+                <button type="button" class="btn btn-primary" onclick="openCreateProjectModal()">
+                  <span>+ Registrasi Proyek Baru</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID & Nama Proyek</th>
+                    <th>PIC</th>
+                    <th>Mulai - Selesai</th>
+                    <th>Notifikasi</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="projectListTableBody">
+                  <tr><td colspan="6" class="text-center py-4">Memuat data proyek...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: DAILY PROGRESS MANAGEMENT -->
+        <section class="tab-pane" id="tabProgress">
+          <div class="panel">
+            <div class="panel-header flex-wrap gap-3">
+              <div>
+                <h3 class="panel-title">Pencatatan & Riwayat Progres Harian</h3>
+                <p class="panel-desc">Catat kemajuan aktual proyek harian untuk kalkulasi Kurva S dan deviasi otomatis.</p>
+              </div>
+              <button type="button" class="btn btn-primary" onclick="openRecordProgressModal()">
+                <span>+ Catat Progres Harian</span>
+              </button>
+            </div>
+
+            <!-- Filter Project Selection -->
+            <div class="filter-bar">
+              <div class="form-group mb-0" style="min-width: 250px;">
+                <label class="form-label" for="progressProjectSelect">Pilih Proyek:</label>
+                <select id="progressProjectSelect" class="form-select" onchange="loadProjectProgressLogs(this.value)">
+                  <option value="">-- Pilih Proyek --</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-responsive" style="margin-top: 16px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Rencana (%)</th>
+                    <th>Realisasi Aktual (%)</th>
+                    <th>Deviasi (%)</th>
+                    <th>Catatan Lapangan</th>
+                    <th>Pencatat</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="progressLogsTableBody">
+                  <tr><td colspan="7" class="text-center py-4">Silakan pilih proyek untuk melihat riwayat progres.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: SETTINGS & CHANNELS -->
+        <section class="tab-pane" id="tabSettings">
+          <div class="settings-grid">
+            <!-- WhatsApp Test Card -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">💬 Uji Integrasi WhatsApp (Fonnte)</h3>
+                <p class="card-desc">Kirim pesan WhatsApp pengujian langsung ke nomor tujuan untuk memvalidasi token Fonnte API.</p>
+              </div>
+
+              <form id="waTestForm" onsubmit="handleSendTestWhatsApp(event)">
+                <div class="form-group">
+                  <label class="form-label" for="waTestPhone">Nomor WhatsApp Tujuan</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">📱</span>
+                    <input type="text" id="waTestPhone" class="form-input" placeholder="08123456789 atau 628123456789" required>
+                  </div>
+                </div>
+
+                <button type="submit" id="btnSendWaTest" class="btn btn-primary">
+                  <span>Kirim Pesan Uji Coba</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Baseline Info Card -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🛡️ Status Keamanan POL.ISMS.001</h3>
+                <p class="card-desc">Sistem beroperasi dengan kontrol keamanan aktif.</p>
+              </div>
+              <ul class="status-list">
+                <li><span class="dot green"></span> Secret Management: PropertiesService Terisolasi</li>
+                <li><span class="dot green"></span> Sandboxing & XSS Sanitization: Input Sanitized</li>
+                <li><span class="dot green"></span> Audit Trail: AppLogger Masked Redaction</li>
+                <li><span class="dot green"></span> Role Based Access Control: Administrator / Regular User</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODALS -->
+  <!-- ========================================== -->
+
+  <!-- 1. MODAL CREATE PROJECT -->
+  <div class="modal-backdrop hidden" id="createProjectModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Registrasi Proyek Baru</h3>
+        <button type="button" class="btn-close" onclick="closeModal('createProjectModal')">×</button>
       </div>
 
-      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5;">
-        Fondasi Security Baseline Control <strong>(POL.ISMS.001)</strong> telah aktif melindungi sistem. Fitur berikutnya pada Milestone v0.1 Foundation dapat dibangun di atas layer keamanan ini.
-      </p>
+      <form id="createProjectForm" onsubmit="handleCreateProject(event)">
+        <div class="form-group">
+          <label class="form-label" for="pName">Nama Proyek *</label>
+          <input type="text" id="pName" class="form-input" placeholder="Contoh: Proyek Gedung Menara 2" required>
+        </div>
 
-      <button type="button" onclick="logoutUser()" class="btn" style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3); color: #fb7185;">
-        <span>Keluar (Logout)</span>
-      </button>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="pStartDate">Tanggal Mulai *</label>
+            <input type="date" id="pStartDate" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pEndDate">Tanggal Selesai *</label>
+            <input type="date" id="pEndDate" class="form-input" required>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="pPicName">Nama PIC *</label>
+            <input type="text" id="pPicName" class="form-input" placeholder="Nama Lengkap Penanggung Jawab" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pPicEmail">Email PIC *</label>
+            <input type="email" id="pPicEmail" class="form-input" placeholder="pic@perusahaan.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="pPicPhone">Nomor WhatsApp PIC</label>
+          <input type="text" id="pPicPhone" class="form-input" placeholder="081234567890">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="pDesc">Deskripsi Proyek (Opsional)</label>
+          <textarea id="pDesc" class="form-textarea" placeholder="Detail lingkup atau catatan proyek..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('createProjectModal')">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Proyek</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. MODAL RECORD DAILY PROGRESS -->
+  <div class="modal-backdrop hidden" id="recordProgressModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Catat Progres Harian</h3>
+        <button type="button" class="btn-close" onclick="closeModal('recordProgressModal')">×</button>
+      </div>
+
+      <form id="recordProgressForm" onsubmit="handleRecordProgress(event)">
+        <div class="form-group">
+          <label class="form-label" for="progModalProject">Pilih Proyek *</label>
+          <select id="progModalProject" class="form-select" required>
+            <option value="">-- Pilih Proyek --</option>
+          </select>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="progModalDate">Tanggal Progres *</label>
+            <input type="date" id="progModalDate" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="progModalActual">Persentase Aktual (0-100%) *</label>
+            <input type="number" step="0.01" min="0" max="100" id="progModalActual" class="form-input" placeholder="cth: 35.5" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="progModalNotes">Catatan Lapangan</label>
+          <textarea id="progModalNotes" class="form-textarea" placeholder="Rincian pekerjaan hari ini..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('recordProgressModal')">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan Progres</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. MODAL S-CURVE VISUALIZER -->
+  <div class="modal-backdrop hidden" id="curveModal">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="curveModalTitle">Visualisasi Kurva S Proyek</h3>
+          <p class="modal-subtitle" id="curveModalSubtitle">Perbandingan kurva rencana terhadap realisasi progres aktual</p>
+        </div>
+        <button type="button" class="btn-close" onclick="closeModal('curveModal')">×</button>
+      </div>
+
+      <div class="curve-container">
+        <canvas id="curveCanvas" width="700" height="320"></canvas>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('curveModal')">Tutup</button>
+      </div>
     </div>
   </div>
 

@@ -1,268 +1,719 @@
 <script>
-  // State Manager
+  // App State
   const AppState = {
-    currentUserId: null,
-    currentUserEmail: null,
-    currentUserRole: null,
-    pendingAction: null
+    isAuthenticated: false,
+    currentUser: null,
+    projects: [],
+    selectedProject: null,
+    currentTab: 'overview'
   };
 
-  // DOM Elements
-  const loginCard = document.getElementById('loginCard');
-  const changePasswordCard = document.getElementById('changePasswordCard');
-  const dashboardCard = document.getElementById('dashboardCard');
-  const loginForm = document.getElementById('loginForm');
-  const changePasswordForm = document.getElementById('changePasswordForm');
-  const toastContainer = document.getElementById('toastContainer');
-  const newPasswordInput = document.getElementById('newPassword');
-
-  // Initialize
+  // DOM Content Loaded
   document.addEventListener('DOMContentLoaded', () => {
+    setupTabNavigation();
+    setupMobileSidebar();
     setupPasswordToggles();
     setupPasswordPolicyLiveCheck();
-    checkExistingSession();
+    checkActiveSession();
   });
 
-  // Check Active Session
-  function checkExistingSession() {
+  // ==========================================
+  // 1. SESSION & AUTHENTICATION
+  // ==========================================
+
+  function checkActiveSession() {
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      console.info("Running in standalone preview mode.");
+      console.info("Running in Preview / Standalone Mock mode.");
+      AppState.isAuthenticated = true;
+      AppState.currentUser = { email: "admin@system.local", role: "ADMINISTRATOR" };
+      renderAuthenticatedApp();
       return;
     }
 
+    showLoading("Memverifikasi sesi pengguna...");
     google.script.run
-      .withSuccessHandler(response => {
-        if (response && response.success && response.data && response.data.isAuthenticated) {
-          const user = response.data.user;
-          if (user.mustChangePassword) {
-            AppState.currentUserId = user.userId;
-            AppState.currentUserEmail = user.email;
-            AppState.currentUserRole = user.role;
-            showView('changePassword');
-          } else {
-            showAuthenticatedView(user);
-          }
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success && response.data && response.data.authenticated) {
+          AppState.isAuthenticated = true;
+          AppState.currentUser = response.data;
+          renderAuthenticatedApp();
+        } else {
+          renderAuthScreen();
         }
       })
-      .withFailureHandler(err => {
-        console.warn("Session check warning:", err);
+      .withFailureHandler((err) => {
+        hideLoading();
+        renderAuthScreen();
       })
       .apiCheckSession();
   }
 
-  // Handle Login Submit
+  function renderAuthScreen() {
+    document.getElementById('authContainer').classList.remove('hidden');
+    document.getElementById('dashboardLayout').classList.add('hidden');
+    document.getElementById('loginCard').classList.remove('hidden');
+    document.getElementById('changePasswordCard').classList.add('hidden');
+  }
+
+  function renderAuthenticatedApp() {
+    document.getElementById('authContainer').classList.add('hidden');
+    document.getElementById('dashboardLayout').classList.remove('hidden');
+
+    if (AppState.currentUser) {
+      const email = AppState.currentUser.email || "user@system";
+      const initial = email.charAt(0).toUpperCase();
+      document.getElementById('sidebarAvatar').textContent = initial;
+      document.getElementById('sidebarUserName').textContent = email.split('@')[0];
+      document.getElementById('sidebarUserRole').textContent = AppState.currentUser.role || "MEMBER";
+    }
+
+    loadDashboardSummary();
+    loadProjects();
+  }
+
+  // Handle Login Form Submit
+  const loginForm = document.getElementById('loginForm');
   if (loginForm) {
-    loginForm.addEventListener('submit', function(e) {
+    loginForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      
       const identifier = document.getElementById('loginIdentifier').value.trim();
       const password = document.getElementById('loginPassword').value;
-      const totp = document.getElementById('totpToken') ? document.getElementById('totpToken').value.trim() : '';
+      const totpToken = document.getElementById('totpToken') ? document.getElementById('totpToken').value.trim() : "";
 
-      if (!identifier || !password) {
-        showToast('Mohon isi email/username dan password.', 'warning');
-        return;
-      }
-
-      setLoading('loginBtn', true, 'Memverifikasi...');
+      showLoading("Memvalidasi kredensial login...");
 
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
         setTimeout(() => {
-          setLoading('loginBtn', false, 'Masuk ke Sistem');
-          showToast('Mode Standalone: Simulasi login berhasil', 'success');
-        }, 800);
+          hideLoading();
+          AppState.isAuthenticated = true;
+          AppState.currentUser = { email: identifier, role: "ADMINISTRATOR" };
+          showToast("Login berhasil (Preview Mode)", "success");
+          renderAuthenticatedApp();
+        }, 500);
         return;
       }
 
       google.script.run
-        .withSuccessHandler(response => {
-          setLoading('loginBtn', false, 'Masuk ke Sistem');
-          
-          if (!response.success) {
-            showToast(response.error.message || 'Login gagal.', 'error');
-            return;
-          }
-
-          const result = response.data;
-          if (result.status === 'REQUIRE_PASSWORD_CHANGE') {
-            AppState.currentUserId = result.userId;
-            AppState.currentUserEmail = result.email;
-            AppState.currentUserRole = result.role;
-            showToast(response.message || 'Harap ubah password default Anda.', 'warning');
-            showView('changePassword');
-          } else if (result.status === 'REQUIRE_MFA_TOKEN') {
-            document.getElementById('mfaGroup').classList.remove('hidden');
-            showToast('Masukkan kode verifikasi 2-Langkah Anda.', 'warning');
-          } else if (result.status === 'AUTHENTICATED') {
-            showToast('Login berhasil. Selamat datang!', 'success');
-            showAuthenticatedView(result.user);
+        .withSuccessHandler((response) => {
+          hideLoading();
+          if (response.success) {
+            AppState.isAuthenticated = true;
+            AppState.currentUser = response.data;
+            if (response.data.mustChangePassword) {
+              document.getElementById('loginCard').classList.add('hidden');
+              document.getElementById('changePasswordCard').classList.remove('hidden');
+              showToast("Wajib mengganti password default Anda.", "info");
+            } else {
+              showToast("Login berhasil! Selamat datang.", "success");
+              renderAuthenticatedApp();
+            }
+          } else {
+            showToast(response.error.message || "Login gagal.", "error");
           }
         })
-        .withFailureHandler(err => {
-          setLoading('loginBtn', false, 'Masuk ke Sistem');
-          showToast(err.message || 'Terjadi kesalahan pada server.', 'error');
+        .withFailureHandler((err) => {
+          hideLoading();
+          showToast(err.message || "Terjadi kesalahan sistem.", "error");
         })
-        .apiLogin(identifier, password, totp);
+        .apiLogin({ identifier, password, totpToken });
     });
   }
 
-  // Handle Initial Password Change Submit
-  if (changePasswordForm) {
-    changePasswordForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-
-      const oldPassword = document.getElementById('oldPassword').value;
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-
-      if (!oldPassword || !newPassword || !confirmPassword) {
-        showToast('Semua kolom password wajib diisi.', 'warning');
-        return;
-      }
-
-      if (newPassword !== confirmPassword) {
-        showToast('Konfirmasi password tidak cocok.', 'error');
-        return;
-      }
-
-      const isPrivileged = AppState.currentUserRole === 'ADMINISTRATOR';
-      const minLength = isPrivileged ? 14 : 8;
-      if (newPassword.length < minLength) {
-        showToast(`Password minimal ${minLength} karakter.`, 'error');
-        return;
-      }
-
-      setLoading('changePasswordBtn', true, 'Menyimpan Password...');
-
-      google.script.run
-        .withSuccessHandler(response => {
-          setLoading('changePasswordBtn', false, 'Simpan & Perbarui Password');
-
-          if (!response.success) {
-            showToast(response.error.message || 'Gagal mengubah password.', 'error');
-            return;
-          }
-
-          showToast('Password berhasil diubah! Silakan login kembali.', 'success');
-          changePasswordForm.reset();
-          showView('login');
-        })
-        .withFailureHandler(err => {
-          setLoading('changePasswordBtn', false, 'Simpan & Perbarui Password');
-          showToast(err.message || 'Terjadi kesalahan sistem.', 'error');
-        })
-        .apiChangeInitialPassword(AppState.currentUserId, oldPassword, newPassword);
-    });
-  }
-
-  // View Switching
-  function showView(viewName) {
-    loginCard.classList.add('hidden');
-    changePasswordCard.classList.add('hidden');
-    dashboardCard.classList.add('hidden');
-
-    if (viewName === 'login') {
-      loginCard.classList.remove('hidden');
-    } else if (viewName === 'changePassword') {
-      changePasswordCard.classList.remove('hidden');
-      const minLength = AppState.currentUserRole === 'ADMINISTRATOR' ? 14 : 8;
-      document.getElementById('ruleLength').querySelector('.text').textContent = `Minimal ${minLength} karakter (${AppState.currentUserRole || 'User'})`;
-    } else if (viewName === 'dashboard') {
-      dashboardCard.classList.remove('hidden');
-    }
-  }
-
-  function showAuthenticatedView(user) {
-    showView('dashboard');
-    document.getElementById('userEmailDisplay').textContent = user.email || user.username;
-    document.getElementById('userRoleDisplay').textContent = user.role || 'REGULAR_USER';
-  }
-
-  // Logout
   function logoutUser() {
-    AppState.currentUserId = null;
-    AppState.currentUserEmail = null;
-    AppState.currentUserRole = null;
-    loginForm.reset();
-    showView('login');
-    showToast('Anda telah keluar dari sistem.', 'success');
-  }
-
-  // Password Policy Live Checklist
-  function setupPasswordPolicyLiveCheck() {
-    if (!newPasswordInput) return;
-
-    newPasswordInput.addEventListener('input', function() {
-      const val = this.value;
-      const isPrivileged = AppState.currentUserRole === 'ADMINISTRATOR';
-      const minLength = isPrivileged ? 14 : 8;
-
-      updateRule('ruleLength', val.length >= minLength);
-      updateRule('ruleUpper', /[A-Z]/.test(val));
-      updateRule('ruleLower', /[a-z]/.test(val));
-      updateRule('ruleNumber', /\d/.test(val));
-      updateRule('ruleSpecial', /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(val));
-    });
-  }
-
-  function updateRule(elementId, isValid) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    if (isValid) {
-      el.classList.add('valid');
+    showLoading("Mengakhiri sesi aman...");
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(() => {
+          hideLoading();
+          AppState.isAuthenticated = false;
+          AppState.currentUser = null;
+          renderAuthScreen();
+          showToast("Anda telah keluar dari sistem.", "info");
+        })
+        .apiLogout();
     } else {
-      el.classList.remove('valid');
+      setTimeout(() => {
+        hideLoading();
+        AppState.isAuthenticated = false;
+        AppState.currentUser = null;
+        renderAuthScreen();
+      }, 300);
     }
   }
 
-  // Password Visibility Toggles
-  function setupPasswordToggles() {
-    document.querySelectorAll('.toggle-password').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const input = this.previousElementSibling;
-        if (!input) return;
-        if (input.type === 'password') {
-          input.type = 'text';
-          this.textContent = '👁️';
+  // ==========================================
+  // 2. NAVIGATION & TABS
+  // ==========================================
+
+  function setupTabNavigation() {
+    const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+    navItems.forEach((item) => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tab = item.getAttribute('data-tab');
+        switchTab(tab);
+      });
+    });
+  }
+
+  function switchTab(tabName) {
+    AppState.currentTab = tabName;
+
+    // Update active nav links
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach((link) => {
+      if (link.getAttribute('data-tab') === tabName) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+
+    // Update tab pane visibility
+    document.querySelectorAll('.tab-pane').forEach((pane) => {
+      pane.classList.remove('active');
+    });
+
+    const targetPane = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+    if (targetPane) {
+      targetPane.classList.add('active');
+    }
+
+    // Update Page Title
+    const titleMap = {
+      overview: 'Dashboard Ringkasan Proyek',
+      projects: 'Project Management & Lifecycle',
+      progress: 'Pencatatan Progres Harian Proyek',
+      settings: 'Pengaturan Sistem & Uji Notifikasi'
+    };
+    document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard System';
+
+    // Auto-refresh relevant data on tab entry
+    if (tabName === 'overview') loadDashboardSummary();
+    if (tabName === 'projects') loadProjects();
+    if (tabName === 'progress') populateProjectDropdowns();
+  }
+
+  function setupMobileSidebar() {
+    const toggleBtn = document.getElementById('mobileMenuToggle');
+    const sidebar = document.querySelector('.sidebar');
+    if (toggleBtn && sidebar) {
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+      });
+    }
+  }
+
+  // ==========================================
+  // 3. DASHBOARD DATA & PROJECT MANAGEMENT
+  // ==========================================
+
+  function loadProjects() {
+    const statusFilter = document.getElementById('projectStatusFilter') ? document.getElementById('projectStatusFilter').value : "";
+    
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      renderProjectTables(getMockProjects());
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler((response) => {
+        if (response && response.success) {
+          AppState.projects = response.data || [];
+          renderProjectTables(AppState.projects);
+          populateProjectDropdowns();
+          updateKPIMetrics(AppState.projects);
+        }
+      })
+      .apiGetAllProjects({ status: statusFilter });
+  }
+
+  function loadDashboardSummary() {
+    loadProjects();
+  }
+
+  function updateKPIMetrics(projects) {
+    let total = projects.length;
+    let onTrack = 0;
+    let delayed = 0;
+    let completed = 0;
+
+    projects.forEach((p) => {
+      const st = p.summary ? p.summary.status : (p.status === 'COMPLETED' ? 'COMPLETED' : 'ON_TRACK');
+      if (st === 'COMPLETED' || p.status === 'COMPLETED') completed++;
+      else if (st === 'DELAYED') delayed++;
+      else onTrack++;
+    });
+
+    document.getElementById('kpiTotalProjects').textContent = total;
+    document.getElementById('kpiOnTrack').textContent = onTrack;
+    document.getElementById('kpiDelayed').textContent = delayed;
+    document.getElementById('kpiCompleted').textContent = completed;
+  }
+
+  function renderProjectTables(projects) {
+    const overviewBody = document.getElementById('overviewProjectTableBody');
+    const projectListBody = document.getElementById('projectListTableBody');
+
+    if (!projects || projects.length === 0) {
+      const emptyRow = '<tr><td colspan="8" class="text-center py-4" style="color: var(--text-muted);">Belum ada data proyek terdaftar.</td></tr>';
+      if (overviewBody) overviewBody.innerHTML = emptyRow;
+      if (projectListBody) projectListBody.innerHTML = emptyRow;
+      return;
+    }
+
+    // 1. Overview Table
+    if (overviewBody) {
+      overviewBody.innerHTML = projects.map((p) => {
+        const s = p.summary || { plannedProgress: 0, actualProgress: 0, deviation: 0, status: p.status };
+        const statusBadge = getStatusBadgeHtml(s.status || p.status);
+        const devClass = s.deviation < 0 ? 'color: var(--accent-red); font-weight: 600;' : 'color: var(--accent-green);';
+
+        return `
+          <tr>
+            <td><strong>${p.project_name}</strong></td>
+            <td>${p.pic_name}<br><small style="color: var(--text-muted);">${p.pic_email}</small></td>
+            <td><small>${p.start_date}<br>${p.end_date}</small></td>
+            <td>${s.plannedProgress}%</td>
+            <td><strong>${s.actualProgress}%</strong></td>
+            <td style="${devClass}">${s.deviation > 0 ? '+' : ''}${s.deviation}%</td>
+            <td>${statusBadge}</td>
+            <td>
+              <button type="button" class="btn btn-sm btn-outline" onclick="viewProjectCurve('${p.project_id}')">📈 Kurva S</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 2. Project Management Table
+    if (projectListBody) {
+      projectListBody.innerHTML = projects.map((p) => {
+        const statusBadge = getStatusBadgeHtml(p.status);
+        const emailIcon = p.is_email_active ? '📧 On' : '📧 Off';
+        const waIcon = p.is_wa_active ? '💬 On' : '💬 Off';
+
+        return `
+          <tr>
+            <td>
+              <strong>${p.project_name}</strong><br>
+              <small style="color: var(--text-muted);">${p.project_id}</small>
+            </td>
+            <td>${p.pic_name} (${p.pic_phone || '-'})</td>
+            <td><small>${p.start_date} s.d. ${p.end_date}</small></td>
+            <td><small>${emailIcon} | ${waIcon}</small></td>
+            <td>${statusBadge}</td>
+            <td style="text-align: right;">
+              <button type="button" class="btn btn-sm btn-outline" onclick="viewProjectCurve('${p.project_id}')">📈 S-Curve</button>
+              <button type="button" class="btn btn-sm btn-outline" style="color: var(--accent-red); border-color: rgba(244,63,94,0.3);" onclick="confirmDeleteProject('${p.project_id}', '${p.project_name}')">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  function getStatusBadgeHtml(status) {
+    switch (status) {
+      case 'ON_TRACK':
+      case 'AHEAD':
+        return '<span class="status-badge badge-on-track">✅ On Track</span>';
+      case 'DELAYED':
+        return '<span class="status-badge badge-delayed">⚠️ Delayed</span>';
+      case 'COMPLETED':
+        return '<span class="status-badge badge-completed">🎉 Selesai</span>';
+      default:
+        return `<span class="status-badge badge-active">${status || 'ACTIVE'}</span>`;
+    }
+  }
+
+  function handleProjectSearch(keyword) {
+    const clean = keyword.toLowerCase();
+    const filtered = AppState.projects.filter((p) => {
+      return (p.project_name && p.project_name.toLowerCase().includes(clean)) ||
+             (p.pic_name && p.pic_name.toLowerCase().includes(clean)) ||
+             (p.pic_email && p.pic_email.toLowerCase().includes(clean));
+    });
+    renderProjectTables(filtered);
+  }
+
+  function populateProjectDropdowns() {
+    const selects = [document.getElementById('progressProjectSelect'), document.getElementById('progModalProject')];
+    selects.forEach((sel) => {
+      if (!sel) return;
+      const currentVal = sel.value;
+      sel.innerHTML = '<option value="">-- Pilih Proyek --</option>' +
+        AppState.projects.map((p) => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+      if (currentVal) sel.value = currentVal;
+    });
+  }
+
+  // ==========================================
+  // 4. DAILY PROGRESS & S-CURVE MODAL
+  // ==========================================
+
+  function loadProjectProgressLogs(projectId) {
+    if (!projectId) {
+      document.getElementById('progressLogsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-4">Silakan pilih proyek.</td></tr>';
+      return;
+    }
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      renderProgressLogsTable([
+        { date: "2026-03-01", planned_progress: 15, actual_progress: 15, deviation: 0, notes: "Pondasi awal", recorded_by: "admin@test" }
+      ]);
+      return;
+    }
+
+    showLoading("Memuat riwayat progres harian...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          renderProgressLogsTable(response.data || []);
+        }
+      })
+      .apiGetProgressHistory(projectId, "desc");
+  }
+
+  function renderProgressLogsTable(logs) {
+    const tbody = document.getElementById('progressLogsTableBody');
+    if (!logs || logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4" style="color: var(--text-muted);">Belum ada catatan progres harian untuk proyek ini.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = logs.map((l) => {
+      const devClass = l.deviation < 0 ? 'color: var(--accent-red); font-weight: 600;' : 'color: var(--accent-green);';
+      return `
+        <tr>
+          <td><strong>${l.date}</strong></td>
+          <td>${l.planned_progress}%</td>
+          <td><strong>${l.actual_progress}%</strong></td>
+          <td style="${devClass}">${l.deviation > 0 ? '+' : ''}${l.deviation}%</td>
+          <td>${l.notes || '-'}</td>
+          <td><small style="color: var(--text-muted);">${l.recorded_by}</small></td>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline" style="color: var(--accent-red);" onclick="deleteProgressLog('${l.progress_id}')">Hapus</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function viewProjectCurve(projectId) {
+    showLoading("Menghitung titik koordinat Kurva S...");
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      hideLoading();
+      drawMockCurve();
+      openModal('curveModal');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.project) {
+          document.getElementById('curveModalTitle').textContent = "Kurva S: " + response.project.project_name;
+          drawSCurveChart(response.plannedCurve, response.actualLogs);
+          openModal('curveModal');
+        }
+      })
+      .apiGetProjectCurveData(projectId, "SCURVE");
+  }
+
+  function drawSCurveChart(plannedPoints, actualLogs) {
+    const canvas = document.getElementById('curveCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Grid
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1;
+    for (let y = 40; y <= 280; y += 60) {
+      ctx.beginPath();
+      ctx.moveTo(40, y);
+      ctx.lineTo(660, y);
+      ctx.stroke();
+    }
+
+    // Draw Planned S-Curve (Cyan)
+    if (plannedPoints && plannedPoints.length > 0) {
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+
+      plannedPoints.forEach((pt, idx) => {
+        const x = 50 + (idx / (plannedPoints.length - 1)) * 600;
+        const y = 280 - (pt.plannedProgress / 100) * 240;
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    // Draw Labels & Legend
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "12px Inter";
+    ctx.fillText("0%", 10, 285);
+    ctx.fillText("50%", 10, 165);
+    ctx.fillText("100%", 10, 45);
+
+    ctx.fillStyle = "#06b6d4";
+    ctx.fillText("— Kurva Rencana (S-Curve)", 500, 30);
+  }
+
+  function drawMockCurve() {
+    const canvas = document.getElementById('curveCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#06b6d4";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(50, 280);
+    ctx.bezierCurveTo(200, 270, 400, 50, 650, 40);
+    ctx.stroke();
+  }
+
+  // ==========================================
+  // 5. MODAL HANDLERS & FORM SUBMITS
+  // ==========================================
+
+  function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function openCreateProjectModal() {
+    document.getElementById('createProjectForm').reset();
+    openModal('createProjectModal');
+  }
+
+  function openRecordProgressModal() {
+    document.getElementById('recordProgressForm').reset();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('progModalDate').value = today;
+    openModal('recordProgressModal');
+  }
+
+  function handleCreateProject(event) {
+    event.preventDefault();
+    const payload = {
+      projectName: document.getElementById('pName').value.trim(),
+      startDate: document.getElementById('pStartDate').value,
+      endDate: document.getElementById('pEndDate').value,
+      picName: document.getElementById('pPicName').value.trim(),
+      picEmail: document.getElementById('pPicEmail').value.trim(),
+      picPhone: document.getElementById('pPicPhone').value.trim(),
+      description: document.getElementById('pDesc').value.trim(),
+      isEmailActive: true,
+      isWaActive: true
+    };
+
+    showLoading("Mendaftarkan proyek baru...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Proyek berhasil didaftarkan!", "success");
+          closeModal('createProjectModal');
+          loadProjects();
         } else {
-          input.type = 'password';
-          this.textContent = '🔒';
+          showToast(response.error.message || "Gagal menyimpan proyek.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Error saat pendaftaran proyek.", "error");
+      })
+      .apiRegisterProject(payload);
+  }
+
+  function handleRecordProgress(event) {
+    event.preventDefault();
+    const payload = {
+      projectId: document.getElementById('progModalProject').value,
+      date: document.getElementById('progModalDate').value,
+      actualProgress: Number(document.getElementById('progModalActual').value),
+      notes: document.getElementById('progModalNotes').value.trim(),
+      allowOverwrite: true
+    };
+
+    showLoading("Mencatat progres harian...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Progres harian berhasil dicatat!", "success");
+          closeModal('recordProgressModal');
+          loadProjects();
+          loadProjectProgressLogs(payload.projectId);
+        } else {
+          showToast(response.error.message || "Gagal mencatat progres.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Error saat mencatat progres.", "error");
+      })
+      .apiRecordDailyProgress(payload);
+  }
+
+  function confirmDeleteProject(projectId, projectName) {
+    if (confirm(`Apakah Anda yakin ingin menghapus proyek "${projectName}" beserta riwayat lognya?`)) {
+      showLoading("Menghapus proyek...");
+      google.script.run
+        .withSuccessHandler((response) => {
+          hideLoading();
+          if (response && response.success) {
+            showToast("Proyek berhasil dihapus.", "success");
+            loadProjects();
+          }
+        })
+        .apiDeleteProject(projectId, true);
+    }
+  }
+
+  function deleteProgressLog(logId) {
+    if (confirm("Apakah Anda yakin ingin menghapus catatan progres ini?")) {
+      showLoading("Menghapus log...");
+      google.script.run
+        .withSuccessHandler((response) => {
+          hideLoading();
+          if (response && response.success) {
+            showToast("Log progres dihapus.", "success");
+            const curProject = document.getElementById('progressProjectSelect').value;
+            loadProjectProgressLogs(curProject);
+            loadProjects();
+          }
+        })
+        .apiDeleteDailyProgress(logId);
+    }
+  }
+
+  function handleSendTestWhatsApp(event) {
+    event.preventDefault();
+    const phone = document.getElementById('waTestPhone').value.trim();
+    showLoading("Mengirim pesan pengujian WhatsApp via Fonnte API...");
+
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success && response.data.sent) {
+          showToast("Pesan uji coba berhasil terkirim ke WhatsApp!", "success");
+        } else {
+          showToast("Gagal mengirim WA. Pastikan FONNTE_TOKEN valid di Script Properties.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast("Error pengiriman WA: " + err.message, "error");
+      })
+      .apiSendTestWhatsApp(phone);
+  }
+
+  function triggerManualSweep() {
+    showLoading("Menjalankan sinkronisasi dan evaluasi pengingat...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast(`Sweep selesai! Total: ${response.data.totalEvaluated}, Terlambat: ${response.data.delayedCount}, Terkirim: ${response.data.notificationsSent}`, "success");
+          loadProjects();
+        }
+      })
+      .apiTriggerDailyReminders();
+  }
+
+  // ==========================================
+  // UTILITIES & PASSWORD POLICY
+  // ==========================================
+
+  function showLoading(msg) {
+    const el = document.getElementById('globalLoading');
+    if (el) {
+      if (msg) document.getElementById('loadingText').textContent = msg;
+      el.classList.remove('hidden');
+    }
+  }
+
+  function hideLoading() {
+    const el = document.getElementById('globalLoading');
+    if (el) el.classList.add('hidden');
+  }
+
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    const iconMap = { success: '✅', error: '❌', info: 'ℹ️' };
+    toast.innerHTML = `<span>${iconMap[type] || 'ℹ️'}</span><span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  function setupPasswordToggles() {
+    document.querySelectorAll('.toggle-password').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const input = btn.previousElementSibling;
+        if (input && input.tagName === 'INPUT') {
+          const isPass = input.getAttribute('type') === 'password';
+          input.setAttribute('type', isPass ? 'text' : 'password');
+          btn.textContent = isPass ? '👁️' : '🔒';
         }
       });
     });
   }
 
-  // Toast Notification
-  function showToast(message, type = 'info') {
-    if (!toastContainer) return;
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '⚠️';
-    if (type === 'warning') icon = '🔒';
+  function setupPasswordPolicyLiveCheck() {
+    const newPassInput = document.getElementById('newPassword');
+    if (!newPassInput) return;
 
-    toast.innerHTML = `<span>${icon}</span><div>${message}</div>`;
-    toastContainer.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(20px)';
-      toast.style.transition = 'all 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 4500);
+    newPassInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      updatePolicyRule('ruleLength', val.length >= 8);
+      updatePolicyRule('ruleUpper', /[A-Z]/.test(val));
+      updatePolicyRule('ruleLower', /[a-z]/.test(val));
+      updatePolicyRule('ruleNumber', /[0-9]/.test(val));
+      updatePolicyRule('ruleSpecial', /[^a-zA-Z0-9]/.test(val));
+    });
   }
 
-  // Loading State
-  function setLoading(buttonId, isLoading, defaultText) {
-    const btn = document.getElementById(buttonId);
-    if (!btn) return;
-    btn.disabled = isLoading;
-    if (isLoading) {
-      btn.innerHTML = `<span class="spinner"></span> <span>${defaultText}</span>`;
-    } else {
-      btn.innerHTML = `<span>${defaultText}</span>`;
+  function updatePolicyRule(elementId, isValid) {
+    const el = document.getElementById(elementId);
+    if (el) {
+      if (isValid) el.classList.add('valid');
+      else el.classList.remove('valid');
     }
+  }
+
+  function getMockProjects() {
+    return [
+      {
+        project_id: "prj_001",
+        project_name: "Proyek Baseline 1 (Demo)",
+        pic_name: "Budi Santoso",
+        pic_email: "budi@perusahaan.com",
+        pic_phone: "081234567890",
+        start_date: "2026-01-01",
+        end_date: "2026-12-31",
+        status: "ACTIVE",
+        is_email_active: true,
+        is_wa_active: true,
+        summary: { plannedProgress: 55, actualProgress: 60, deviation: 5, status: "ON_TRACK" }
+      }
+    ];
   }
 </script>
