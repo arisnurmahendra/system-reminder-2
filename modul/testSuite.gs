@@ -1,5 +1,5 @@
 /**
- * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, & Error Handling
+ * Unit Test & Verification Suite untuk Security, Repository, Service, Logging, Error Handling, & Progress Engine
  * Dapat dijalankan dari Apps Script Editor maupun CLI
  */
 
@@ -456,6 +456,82 @@ function runAllErrorHandlingTests() {
 
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN ERROR HANDLING: " + totalPassed + "/" + results.length + " LULUS ===");
+
+  return {
+    total: results.length,
+    passed: totalPassed,
+    failed: results.length - totalPassed,
+    details: results
+  };
+}
+
+function runAllProgressEngineTests() {
+  var results = [];
+
+  function assert(testName, condition, details) {
+    if (condition) {
+      results.push({ name: testName, passed: true });
+      Logger.log("✅ PASS: " + testName);
+    } else {
+      results.push({ name: testName, passed: false, details: details });
+      Logger.log("❌ FAIL: " + testName + " -> " + details);
+    }
+  }
+
+  Logger.log("=== MEMULAI TEST PROGRESS CALCULATION ENGINE ===");
+
+  // 1. Test Duration & Elapsed Computations
+  var dur = ProgressEngine.calculateTotalDuration("2026-01-01", "2026-01-11");
+  var elapsed = ProgressEngine.calculateElapsedDays("2026-01-01", "2026-01-06");
+  var remaining = ProgressEngine.calculateDaysRemaining("2026-01-10", "2026-01-06");
+  var schedPct = ProgressEngine.calculateSchedulePercentage("2026-01-01", "2026-01-11", "2026-01-06");
+
+  assert("Total Duration Calculated (10 days)", dur === 10, "Duration error: " + dur);
+  assert("Elapsed Days Calculated (5 days)", elapsed === 5, "Elapsed error: " + elapsed);
+  assert("Days Remaining Calculated (4 days)", remaining === 4, "Remaining error: " + remaining);
+  assert("Schedule Percentage Calculated (50%)", schedPct === 50, "Schedule % error: " + schedPct);
+
+  // 2. Test S-Curve Generation Series
+  var curvePoints = ProgressEngine.generatePlannedCurve("2026-01-01", "2026-01-21", 10, "SCURVE");
+  assert("Planned S-Curve Points Generated (11 points)", curvePoints.length === 11, "Curve points count mismatch");
+  assert("S-Curve Starts at 0% and Ends at 100%", curvePoints[0].plannedProgress === 0 && curvePoints[10].plannedProgress === 100, "Curve boundaries error");
+
+  // 3. Test Progress Value Validation
+  var validVal = ProgressEngine.validateProgressValue(75.5);
+  assert("Valid Progress 75.5% Accepted", validVal === 75.5, "Valid progress rejected");
+
+  var caughtInvalid = false;
+  try {
+    ProgressEngine.validateProgressValue(150);
+  } catch (e) {
+    caughtInvalid = true;
+  }
+  assert("Invalid Progress >100% Throws Validation Error", caughtInvalid, "Invalid progress passed");
+
+  // 4. Test Date Range Validation
+  var caughtDateErr = false;
+  try {
+    ProgressEngine.validateDateRange("2026-05-10", "2026-01-01");
+  } catch (e) {
+    caughtDateErr = true;
+  }
+  assert("Invalid Date Range (start > end) Throws Error", caughtDateErr, "Invalid date range passed");
+
+  // 5. Test Status Indicator Metadata
+  var indOnTrack = ProgressEngine.getStatusIndicator("ON_TRACK");
+  var indDelayed = ProgressEngine.getStatusIndicator("DELAYED");
+  var indCompleted = ProgressEngine.getStatusIndicator("COMPLETED");
+
+  assert("ON_TRACK Indicator Has Green Color and Checkmark", indOnTrack.color === "#10b981" && indOnTrack.icon === "✅", "ON_TRACK indicator error");
+  assert("DELAYED Indicator Has Red Color and Warning Icon", indDelayed.color === "#f43f5e" && indDelayed.icon === "⚠️", "DELAYED indicator error");
+  assert("COMPLETED Indicator Has Green Color and Party Icon", indCompleted.color === "#10b981" && indCompleted.icon === "🎉", "COMPLETED indicator error");
+
+  // 6. Test Projected Completion Date
+  var projected = ProgressEngine.calculateEstimatedCompletionDate("2026-01-01", "2026-01-20", 50, "2026-01-11");
+  assert("Estimated Completion Date Matches Trend", Boolean(projected) && projected.indexOf("2026") === 0, "Projection calculation error: " + projected);
+
+  var totalPassed = results.filter(function(r) { return r.passed; }).length;
+  Logger.log("=== HASIL PENGUJIAN PROGRESS ENGINE: " + totalPassed + "/" + results.length + " LULUS ===");
 
   return {
     total: results.length,

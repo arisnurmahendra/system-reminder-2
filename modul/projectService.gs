@@ -212,14 +212,22 @@ var ProjectService = {
 
     var deviation = ProgressEngine.calculateDeviation(latestActual, planned);
     var status = ProgressEngine.determineProgressStatus(latestActual, planned);
+    var indicator = ProgressEngine.getStatusIndicator(status);
     var daysRemaining = ProgressEngine.calculateDaysRemaining(project.end_date);
+    var totalDuration = ProgressEngine.calculateTotalDuration(project.start_date, project.end_date);
+    var schedulePercentage = ProgressEngine.calculateSchedulePercentage(project.start_date, project.end_date, today);
+    var estimatedCompletion = ProgressEngine.calculateEstimatedCompletionDate(project.start_date, project.end_date, latestActual, lastRecordedDate);
 
     return {
       plannedProgress: planned,
       actualProgress: latestActual,
       deviation: deviation,
       status: status,
+      indicator: indicator,
+      totalDuration: totalDuration,
+      schedulePercentage: schedulePercentage,
       daysRemaining: daysRemaining,
+      estimatedCompletionDate: estimatedCompletion,
       lastRecordedDate: lastRecordedDate,
       totalProgressLogs: history.length
     };

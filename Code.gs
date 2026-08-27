@@ -136,6 +136,28 @@ function apiGetLatestProgress(projectId) {
   }, "apiGetLatestProgress");
 }
 
+function apiGetProjectCurveData(projectId, curveType) {
+  return safeWebResponse(function() {
+    var cleanId = sanitizeString(projectId);
+    var project = ProjectRepository.findById(cleanId);
+    if (!project) {
+      throw ErrorFactory.notFound("Proyek", cleanId);
+    }
+
+    var plannedCurve = ProgressEngine.generatePlannedCurve(project.start_date, project.end_date, 20, curveType || "SCURVE");
+    var actualLogs = ProgressLogRepository.findByProject(cleanId);
+    actualLogs.sort(function(a, b) {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    return {
+      project: project,
+      plannedCurve: plannedCurve,
+      actualLogs: actualLogs
+    };
+  }, "apiGetProjectCurveData");
+}
+
 // ==========================================
 // 4. NOTIFICATION & TRIGGER ENDPOINTS
 // ==========================================
