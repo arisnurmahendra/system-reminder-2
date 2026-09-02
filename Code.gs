@@ -19,12 +19,13 @@ function doGet(e) {
     appVersion: CONFIG.APP.VERSION
   };
 
-  return template
-    .evaluate()
-    .setTitle(CONFIG.APP.NAME + " — Dashboard & Reminder")
-    .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+  var output = template.evaluate();
+  output.setTitle(CONFIG.APP.NAME + " — Dashboard & Reminder");
+  output.addMetaTag("viewport", "width=device-width, initial-scale=1.0");
+  if (typeof HtmlService.XFrameOptionsMode !== "undefined" && HtmlService.XFrameOptionsMode.ALLOWALL) {
+    output.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  return output;
 }
 
 /**
@@ -39,6 +40,12 @@ function include(filename) {
 // ==========================================
 // 1. AUTHENTICATION & SESSION ENDPOINTS
 // ==========================================
+
+function apiInitializeDatabase() {
+  return safeWebResponse(function() {
+    return SpreadsheetManager.verifyAndSetupDatabase();
+  }, "apiInitializeDatabase");
+}
 
 function apiLogin(identifier, password, totpToken) {
   return safeWebResponse(function() {
