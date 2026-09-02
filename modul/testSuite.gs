@@ -191,6 +191,16 @@ function runAllRepositoryTests() {
     "Concrete repositories registration failed"
   );
 
+  // 11. Test verifyAndSetupDatabase & Default Admin Seeding
+  var setupRes = SpreadsheetManager.verifyAndSetupDatabase();
+  assert("Database Verification & Setup Succeeded", setupRes.success === true, "Setup failed");
+
+  var adminUser = UserRepository.findByIdentifier("admin");
+  assert("Default Admin User 'admin' Created", adminUser && adminUser.username === "admin" && adminUser.roleName === CONFIG.ROLES.ADMINISTRATOR, "Admin creation failed");
+
+  var loginRes = processUserLogin("admin", "admin123");
+  assert("Login with Default Admin 'admin' / 'admin123' Succeeded", loginRes.authenticated === true && loginRes.mustChangePassword === true, "Admin login failed");
+
   var totalPassed = results.filter(function(r) { return r.passed; }).length;
   Logger.log("=== HASIL PENGUJIAN REPOSITORY: " + totalPassed + "/" + results.length + " LULUS ===");
 
