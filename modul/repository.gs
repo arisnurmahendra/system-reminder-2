@@ -85,17 +85,136 @@ var SpreadsheetManager = {
   clearCache: function() {
     this._spreadsheetCache = null;
     this._sheetCache = {};
+    if (typeof UserRepository !== "undefined" && UserRepository.invalidateCache) UserRepository.invalidateCache();
+    if (typeof AuditLogRepository !== "undefined" && AuditLogRepository.invalidateCache) AuditLogRepository.invalidateCache();
+    if (typeof ConfigRepository !== "undefined" && ConfigRepository.invalidateCache) ConfigRepository.invalidateCache();
+    if (typeof ProjectRepository !== "undefined" && ProjectRepository.invalidateCache) ProjectRepository.invalidateCache();
+    if (typeof ProgressLogRepository !== "undefined" && ProgressLogRepository.invalidateCache) ProgressLogRepository.invalidateCache();
+  },
+
+  /**
+   * Skema terpusat seluruh lembar kerja sistem
+   * @returns {object}
+   */
+  getRequiredSheetsSchema: function() {
+    var schema = {};
+    schema[CONFIG.SPREADSHEET.SHEETS.USER_ROLES] = [
+      "user_id", "email", "username", "password_hash", "salt",
+      "role_name", "must_change_password", "failed_login_attempts",
+      "lockout_until", "is_active", "created_at", "last_login_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.AUDIT_LOGS] = [
+      "log_id", "timestamp", "user_id", "user_email",
+      "action", "status", "page_reference", "details"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.SYSTEM_CONFIG] = [
+      "config_key", "config_value", "description", "updated_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.PROJECTS] = [
+      "project_id", "project_name", "start_date", "end_date",
+      "pic_name", "pic_email", "pic_phone", "is_email_active",
+      "is_wa_active", "status", "created_at", "updated_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.PROGRESS_LOGS] = [
+      "progress_id", "project_id", "date", "planned_progress",
+      "actual_progress", "deviation", "notes", "recorded_by", "created_at"
+    ];
+    return schema;
+  },
+
+  /**
+   * Memeriksa struktur spreadsheet secara menyeluruh:
+   * 1. Jika sheet belum ada -> buat sheet baru dengan header yang sesuai
+   * 2. Jika sheet ada tapi kosong -> tambahkan baris header
+   * 3. Jika tabel user masih kosong -> buat akun default username 'admin' & password 'admin123'
+   * @returns {object} Status inisialisasi & rincian aksi
+   */
+  verifyAndSetupDatabase: function() {
+    var report = {
+      verifiedAt: new Date().toISOString(),
+      createdSheets: [],
+      headerAddedSheets: [],
+      existingSheets: [],
+      defaultAdminCreated: false
+    };
+
+    var ss = this.getSpreadsheet();
+    var schema = this.getRequiredSheetsSchema();
+
+    for (var sheetName in schema) {
+      if (Object.prototype.hasOwnProperty.call(schema, sheetName)) {
+        var defaultHeaders = schema[sheetName];
+        var sheet = ss.getSheetByName(sheetName);
+
+        if (!sheet) {
+          sheet = ss.insertSheet(sheetName);
+          sheet.appendRow(defaultHeaders);
+          report.createdSheets.push(sheetName);
+        } else {
+          if (sheet.getLastRow() === 0) {
+            sheet.appendRow(defaultHeaders);
+            report.headerAddedSheets.push(sheetName);
+          } else {
+            report.existingSheets.push(sheetName);
+          }
+        }
+
+        this._sheetCache[sheetName] = sheet;
+      }
+    }
+
+    // Periksa tabel User_Roles untuk akun default admin
+    var adminCreated = this.seedDefaultAdminIfEmpty();
+    report.defaultAdminCreated = adminCreated;
+
+    this.clearCache();
+    return formatSuccessResponse(report, "Struktur spreadsheet berhasil diverifikasi dan disiapkan.");
+  },
+
+  /**
+   * Membuat user default admin jika tabel user belum memiliki data
+   * @returns {boolean} True jika akun default dibuat
+   */
+  seedDefaultAdminIfEmpty: function() {
+    try {
+      var users = UserRepository.getAllUsers();
+      if (!users || users.length === 0) {
+        var defaultUsername = "admin";
+        var defaultEmail = "admin@system.local";
+        var defaultPassword = "admin123";
+        var salt = generateSalt();
+        var hash = hashPasswordWithSalt(defaultPassword, salt);
+
+        UserRepository.createUser({
+          username: defaultUsername,
+          email: defaultEmail,
+          passwordHash: hash,
+          salt: salt,
+          roleName: CONFIG.ROLES.ADMINISTRATOR,
+          mustChangePassword: true,
+          isActive: true
+        });
+
+        AppLogger.info("SpreadsheetManager", "Akun default admin berhasil dibuat ('admin' / 'admin123')", {
+          username: defaultUsername,
+          email: defaultEmail,
+          role: CONFIG.ROLES.ADMINISTRATOR
+        });
+
+        return true;
+      }
+      return false;
+    } catch (err) {
+      AppLogger.warn("SpreadsheetManager", "Gagal memeriksa/menambahkan default admin: " + err.message);
+      return false;
+    }
   },
 
   /**
    * Inisialisasi seluruh lembar kerja sistem secara terpusat
    */
   initializeAllSheets: function() {
-    UserRepository.init();
-    AuditLogRepository.init();
-    ConfigRepository.init();
-    ProjectRepository.init();
-    ProgressLogRepository.init();
+    return this.verifyAndSetupDatabase();
   }
 };
 
@@ -474,6 +593,9 @@ var UserRepository = (function() {
 
     create: function(userObj) {
       return this.createUser(userObj);
+    },
+    invalidateCache: function() {
+      return base.invalidateCache();
     }
   };
 })();
@@ -514,6 +636,10 @@ var AuditLogRepository = (function() {
 
     findAll: function(filterFn) {
       return base.findAll(filterFn);
+    },
+
+    invalidateCache: function() {
+      return base.invalidateCache();
     }
   };
 })();
@@ -553,6 +679,10 @@ var ConfigRepository = (function() {
         });
       }
       return true;
+    },
+
+    invalidateCache: function() {
+      return base.invalidateCache();
     }
   };
 })();
@@ -589,6 +719,9 @@ var ProjectRepository = (function() {
     },
     delete: function(projectId) {
       return base.deleteById(projectId);
+    },
+    invalidateCache: function() {
+      return base.invalidateCache();
     }
   };
 })();
@@ -631,6 +764,9 @@ var ProgressLogRepository = (function() {
     },
     delete: function(progressId) {
       return base.deleteById(progressId);
+    },
+    invalidateCache: function() {
+      return base.invalidateCache();
     }
   };
 })();
