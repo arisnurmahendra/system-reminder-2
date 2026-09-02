@@ -177,6 +177,22 @@ System-Reminder-2/
 
 ---
 
+
+Administrator
+    USER LOGIN : admin
+    EMAIL : admin@system.local
+    PASSWORD: admin123
+
+Project Manager
+    USER LOGIN : manager
+    EMAIL : manager@system.local
+    PASSWORD: password123
+
+Auditor
+    USER LOGIN : auditor
+    EMAIL : auditor@system.local
+    PASSWORD: password123
+
 ## © Lisensi
 Proyek ini dilisensikan di bawah Lisensi MIT - silakan lihat berkas [LICENSE](LICENSE) untuk rinciannya.
 
