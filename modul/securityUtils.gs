@@ -239,19 +239,33 @@ function formatErrorResponse(error, code) {
  * @returns {object}
  */
 function safeWebResponse(callbackFn, contextName) {
+  var ctx = contextName || "API_HANDLER";
+  
+  if (typeof viewLog !== "undefined" && viewLog) {
+    console.log("🚀 [REQUEST START] Mengeksekusi: " + ctx);
+  }
+  
   try {
     var result = callbackFn();
+    
+    if (typeof viewLog !== "undefined" && viewLog) {
+      console.log("✅ [REQUEST SUCCESS] Berhasil: " + ctx);
+    }
+    
     // Jika result sudah berformat standar, kembalikan langsung
     if (result && typeof result === "object" && typeof result.success === "boolean") {
       return result;
     }
     return formatSuccessResponse(result);
   } catch (err) {
-    var context = contextName || "API_HANDLER";
-    if (typeof ErrorHandler !== "undefined" && ErrorHandler.handle) {
-      return ErrorHandler.handle(err, context);
+    if (typeof viewLog !== "undefined" && viewLog) {
+      console.error("❌ [REQUEST FAILED] Kesalahan di " + ctx + ": " + err.message);
     }
-    AppLogger.error(context, err.message || "Terjadi kesalahan internal pada sistem.", err);
+    
+    if (typeof ErrorHandler !== "undefined" && ErrorHandler.handle) {
+      return ErrorHandler.handle(err, ctx);
+    }
+    AppLogger.error(ctx, err.message || "Terjadi kesalahan internal pada sistem.", err);
     return formatErrorResponse(err.message || "Terjadi kesalahan internal.", CONFIG.ERROR_CODES.SYS_INTERNAL_ERROR);
   }
 }

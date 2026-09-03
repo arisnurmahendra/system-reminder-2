@@ -501,6 +501,9 @@ var UserRepository = (function() {
 
     getAllUsers: function() {
       return base.findAll().map(function(item) {
+        var mustChange = item.must_change_password;
+        var isActive = item.is_active;
+
         return {
           rowIndex: item._rowIndex,
           userId: String(item.user_id || ""),
@@ -509,10 +512,10 @@ var UserRepository = (function() {
           passwordHash: String(item.password_hash || ""),
           salt: String(item.salt || ""),
           roleName: String(item.role_name || CONFIG.ROLES.REGULAR_USER),
-          mustChangePassword: item.must_change_password === true || item.must_change_password === "TRUE",
+          mustChangePassword: mustChange === true || String(mustChange).toUpperCase() === "TRUE" || mustChange === 1,
           failedLoginAttempts: Number(item.failed_login_attempts || 0),
           lockoutUntil: item.lockout_until ? String(item.lockout_until) : null,
-          isActive: item.is_active === true || item.is_active === "TRUE" || item.is_active === 1,
+          isActive: isActive === true || String(isActive).toUpperCase() === "TRUE" || isActive === 1,
           createdAt: item.created_at ? String(item.created_at) : null,
           lastLoginAt: item.last_login_at ? String(item.last_login_at) : null
         };

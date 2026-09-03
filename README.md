@@ -65,10 +65,14 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan dengan arsitektur 
 ## ⚙️ Panduan Penggunaan & Instalasi
 
 1. Buat proyek Google Apps Script baru di [script.google.com](https://script.google.com).
-2. Hubungkan dengan Google Spreadsheet sebagai basis data.
+2. Hubungkan dengan Google Spreadsheet sebagai basis data (sangat disarankan menggunakan tipe *Container-Bound Script* dengan membuka Spreadsheet lalu memilih **Extensions > Apps Script**).
 3. Unggah seluruh berkas kode proyek ke Apps Script.
-4. Atur konfigurasi pada **Project Settings → Script Properties** (misalnya `FONNTE_TOKEN`).
-5. Deploy sebagai **Web App** (Execute as: *User accessing the web app* / *Me*, Who has access: *Anyone with Google account*).
+4. Buka halaman Spreadsheet Anda, lalu klik menu kustom: **🚀 System Reminder > 🔑 Script Properties > ⚙️ Setup Default Properties** (Atau atur manual di **Project Settings → Script Properties**).
+   - Pastikan variabel `SPREADSHEET_ID` sudah terisi dengan ID spreadsheet Anda (terutama jika Anda menggunakan Standalone Script).
+   - Isi variabel lain seperti `FONNTE_TOKEN` jika Anda ingin mengaktifkan pengingat WhatsApp.
+5. Jalankan inisialisasi awal lewat menu spreadsheet: **🚀 System Reminder > ⚙️ Pengujian & Dev > 🗃️ Inisialisasi Database**. (Skrip akan otomatis membuat *sheet* yang dibutuhkan beserta akun admin *default*).
+6. (Opsi) Jika Anda ingin menguji sistem dengan data contoh, klik: **🚀 System Reminder > ⚙️ Pengujian & Dev > 🎲 Generate Data Dummy**.
+7. Deploy sebagai **Web App** (Execute as: *User accessing the web app* / *Me*, Who has access: *Anyone with Google account*), lalu buka URL Web App tersebut.
 
 ---
 
@@ -176,6 +180,18 @@ System-Reminder-2/
 ```
 
 ---
+## 🔑 Data Akun Default (Pengujian)
+
+Gunakan kredensial berikut untuk mencoba fungsionalitas sistem jika Anda sudah menjalankan **Generate Data Dummy**:
+
+| Peran / Role | Username | Email Login | Password Default |
+| :--- | :--- | :--- | :--- |
+| **Administrator** | `admin` | `admin@system.local` | `admin123` |
+| **Project Manager** | `manager` | `manager@system.local` | `password123` |
+| **Auditor** | `auditor` | `auditor@system.local` | `password123` |
+
+> [!WARNING]
+> Sangat disarankan untuk segera mengubah password default `admin` jika sistem akan digunakan pada ranah *production*.
 
 ## © Lisensi
 Proyek ini dilisensikan di bawah Lisensi MIT - silakan lihat berkas [LICENSE](LICENSE) untuk rinciannya.

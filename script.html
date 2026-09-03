@@ -21,7 +21,39 @@
   // 1. SESSION & AUTHENTICATION
   // ==========================================
 
+  const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
+  let idleTimer = null;
+
+  function resetIdleTimer() {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (AppState.isAuthenticated) {
+      idleTimer = setTimeout(() => {
+        showToast("Sesi berakhir otomatis karena tidak ada aktivitas.", "warning");
+        logoutUser();
+      }, IDLE_TIMEOUT_MS);
+    }
+  }
+
+  // Monitor aktivitas pengguna untuk mencegah auto-logout saat sedang aktif
+  ['mousemove', 'keydown', 'scroll', 'click'].forEach(evt => {
+    document.addEventListener(evt, resetIdleTimer);
+  });
+
   function checkActiveSession() {
+    const savedSession = sessionStorage.getItem('sysrem_session');
+    if (savedSession) {
+      try {
+        const userData = JSON.parse(savedSession);
+        AppState.isAuthenticated = true;
+        AppState.currentUser = userData;
+        renderAuthenticatedApp();
+        resetIdleTimer();
+        return;
+      } catch (e) {
+        sessionStorage.removeItem('sysrem_session');
+      }
+    }
+
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
       console.info("Running in Preview / Standalone Mock mode.");
       AppState.isAuthenticated = true;
@@ -37,7 +69,9 @@
         if (response && response.success && response.data && response.data.authenticated) {
           AppState.isAuthenticated = true;
           AppState.currentUser = response.data;
+          sessionStorage.setItem('sysrem_session', JSON.stringify(response.data));
           renderAuthenticatedApp();
+          resetIdleTimer();
         } else {
           renderAuthScreen();
         }
@@ -105,8 +139,10 @@
               document.getElementById('changePasswordCard').classList.remove('hidden');
               showToast("Wajib mengganti password default Anda.", "info");
             } else {
+              sessionStorage.setItem('sysrem_session', JSON.stringify(response.data));
               showToast("Login berhasil! Selamat datang.", "success");
               renderAuthenticatedApp();
+              resetIdleTimer();
             }
           } else {
             showToast(response.error.message || "Login gagal.", "error");
@@ -116,12 +152,54 @@
           hideLoading();
           showToast(err.message || "Terjadi kesalahan sistem.", "error");
         })
-        .apiLogin({ identifier, password, totpToken });
+        .apiLogin(identifier, password, totpToken);
+    });
+  }
+
+  // Handle Change Password Form
+  const changePasswordForm = document.getElementById('changePasswordForm');
+  if (changePasswordForm) {
+    changePasswordForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const oldPassword = document.getElementById('oldPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (newPassword !== confirmPassword) {
+        showToast("Konfirmasi password baru tidak cocok.", "error");
+        return;
+      }
+
+      const userId = AppState.currentUser ? AppState.currentUser.userId : "";
+      showLoading("Memperbarui password...");
+
+      google.script.run
+        .withSuccessHandler((response) => {
+          hideLoading();
+          if (response.success) {
+            showToast("Password berhasil diperbarui. Silakan login kembali.", "success");
+            changePasswordForm.reset();
+            document.getElementById('changePasswordCard').classList.add('hidden');
+            document.getElementById('loginCard').classList.remove('hidden');
+            AppState.isAuthenticated = false;
+            AppState.currentUser = null;
+          } else {
+            showToast(response.error ? response.error.message : "Gagal memperbarui password.", "error");
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoading();
+          showToast(err.message || "Terjadi kesalahan sistem.", "error");
+        })
+        .apiChangeInitialPassword(userId, oldPassword, newPassword);
     });
   }
 
   function logoutUser() {
     showLoading("Mengakhiri sesi aman...");
+    sessionStorage.removeItem('sysrem_session');
+    if (idleTimer) clearTimeout(idleTimer);
+    
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run
         .withSuccessHandler(() => {
@@ -223,7 +301,14 @@
           renderProjectTables(AppState.projects);
           populateProjectDropdowns();
           updateKPIMetrics(AppState.projects);
+        } else {
+          showToast(response.error ? response.error.message : "Gagal memuat proyek", "error");
+          renderProjectTables([]);
         }
+      })
+      .withFailureHandler((err) => {
+        showToast(err.message || "Terjadi kesalahan sistem.", "error");
+        renderProjectTables([]);
       })
       .apiGetAllProjects({ status: statusFilter });
   }
@@ -242,11 +327,15 @@
           document.getElementById('kpiOnTrack').textContent = sum.onTrackCount;
           document.getElementById('kpiDelayed').textContent = sum.delayedCount;
           document.getElementById('kpiCompleted').textContent = sum.completedProjects;
+        } else if (response && response.error) {
+          showToast(response.error.message, "error");
         }
       })
+      .withFailureHandler((err) => {
+        showToast(err.message || "Gagal memuat ringkasan dashboard.", "error");
+      })
       .apiGetDashboardExecutiveSummary();
-
-    loadProjects();
+      loadProjects();
   }
 
   function updateKPIMetrics(projects) {
@@ -647,6 +736,36 @@
         }
       })
       .apiTriggerDailyReminders();
+  }
+
+  function handleRevokePermissions() {
+    if (!confirm("PERINGATAN KRITIS:\n\nAnda akan mencabut secara paksa semua akses Google (Spreadsheet, Gmail, dll) untuk aplikasi ini. Web App tidak akan berfungsi hingga diotorisasi ulang.\n\nApakah Anda yakin ingin melanjutkan?")) {
+      return;
+    }
+    
+    showLoading("Mencabut akses Google Apps Script...");
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler((response) => {
+          hideLoading();
+          if (response && response.success) {
+            showToast("Berhasil: Semua akses skrip telah dicabut.", "success");
+            setTimeout(() => logoutUser(), 2000); // Logout
+          } else {
+            showToast(response.error ? response.error.message : "Gagal mencabut akses.", "error");
+          }
+        })
+        .withFailureHandler((err) => {
+          hideLoading();
+          showToast(err.message || "Terjadi kesalahan sistem.", "error");
+        })
+        .apiRevokeScriptPermissions();
+    } else {
+      setTimeout(() => {
+        hideLoading();
+        showToast("Hanya tersedia di Web App Live.", "info");
+      }, 500);
+    }
   }
 
   // ==========================================

@@ -3,6 +3,9 @@
  * Mengikuti standar arsitektur Layer Architecture & Baseline Control POL.ISMS.001
  */
 
+// Toggle global untuk debug mode (Console Logging)
+var viewLog = true;
+
 /**
  * Endpoint HTTP GET untuk merender Antarmuka Web App
  */
@@ -125,6 +128,17 @@ function apiSetProjectStatus(projectId, status) {
   return safeWebResponse(function() {
     return ProjectService.setProjectStatus(sanitizeString(projectId), sanitizeString(status));
   }, "apiSetProjectStatus");
+}
+
+/**
+ * ⚠️ Mencabut Izin Aplikasi (Revoke Permissions)
+ * @returns {object} Response Standar
+ */
+function apiRevokeScriptPermissions() {
+  return safeWebResponse(function() {
+    ScriptApp.invalidateAuth();
+    return formatSuccessResponse({}, "Akses Google Apps Script berhasil dicabut.");
+  }, "apiRevokeScriptPermissions");
 }
 
 // ==========================================
