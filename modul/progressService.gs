@@ -26,10 +26,10 @@ var ProgressService = {
     var recordDate = payload.date || ProgressEngine.formatDateYMD_(new Date());
     var recordedBy = payload.recordedBy || getCurrentUserEmail_() || "SYSTEM";
 
-    // Cek apakah sudah ada catatan progres pada tanggal yang sama untuk proyek ini
+    // Cek apakah sudah ada catatan progres pada tanggal yang sama untuk proyek ini (dan wbs_id yang sama)
     var existingLogs = ProgressLogRepository.findByProject(project.project_id);
     var duplicate = existingLogs.filter(function(l) {
-      return l.date === recordDate;
+      return l.date === recordDate && (l.wbs_id || "") === (payload.wbsId || "");
     });
 
     if (duplicate.length > 0 && !payload.allowOverwrite) {
@@ -58,6 +58,7 @@ var ProgressService = {
     } else {
       var logData = {
         project_id: project.project_id,
+        wbs_id: payload.wbsId || "",
         date: recordDate,
         planned_progress: planned,
         actual_progress: actual,
@@ -71,6 +72,10 @@ var ProgressService = {
     // Update status proyek menjadi COMPLETED jika aktual mencapai 100%
     if (actual >= 100 && project.status !== "COMPLETED") {
       ProjectRepository.update(project.project_id, { status: "COMPLETED" });
+    }
+
+    if (payload.wbsId) {
+      WBSRepository.update(payload.wbsId, { actual_progress: actual });
     }
 
     AppLogger.audit("ProgressService", "PROGRESS_RECORDED", "SUCCESS", {
@@ -257,5 +262,32 @@ var ProgressService = {
     });
 
     return formatSuccessResponse(logs[0]);
+  },
+
+  /**
+   * Mengambil data untuk pembuatan S-Curve (Planned vs Actual)
+   * @param {string} projectId 
+   * @param {string} curveType 
+   * @returns {object}
+   */
+  getProjectCurveData: function(projectId, curveType) {
+    validateRequired(projectId, "Project ID");
+    
+    var project = ProjectRepository.findById(projectId);
+    if (!project) throw ErrorFactory.notFound("Proyek", projectId);
+
+    var plannedCurve = ProgressEngine.generatePlannedCurve(project.start_date, project.end_date, 20, curveType || "SCURVE");
+    var actualLogs = ProgressLogRepository.findByProject(projectId);
+
+    // Sort actual logs kronologis
+    actualLogs.sort(function(a, b) {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    return formatSuccessResponse({
+      project: project,
+      plannedCurve: plannedCurve,
+      actualLogs: actualLogs
+    });
   }
 };

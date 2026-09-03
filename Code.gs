@@ -74,6 +74,20 @@ function apiCheckSession() {
   }, "apiCheckSession");
 }
 
+function apiLogout() {
+  return safeWebResponse(function() {
+    var email = "UNKNOWN";
+    try {
+      email = Session.getActiveUser().getEmail() || "UNKNOWN";
+    } catch(e) {}
+    
+    if (typeof writeAuditLog !== 'undefined') {
+      writeAuditLog("SYSTEM", email, "LOGOUT", "SUCCESS", "Code.gs", { message: "User logged out dari antarmuka Web App" });
+    }
+    return formatSuccessResponse({}, "Berhasil keluar dari sistem.");
+  }, "apiLogout");
+}
+
 function apiGetSystemMetadata() {
   return safeWebResponse(function() {
     return {
@@ -228,6 +242,48 @@ function apiGetDashboardExecutiveSummary() {
   return safeWebResponse(function() {
     return DashboardSummaryService.getExecutiveSummary();
   }, "apiGetDashboardExecutiveSummary");
+}
+
+function apiGetProjectCurveData(projectId, curveType) {
+  return safeWebResponse(function() {
+    return ProgressService.getProjectCurveData(sanitizeString(projectId), curveType);
+  }, "apiGetProjectCurveData");
+}
+
+function apiGetProjectWBSAndSchedule(projectId) {
+  return safeWebResponse(function() {
+    return WBSService.getProjectWBSAndSchedule(sanitizeString(projectId));
+  }, "apiGetProjectWBSAndSchedule");
+}
+
+function apiSaveWBSItem(payload) {
+  return safeWebResponse(function() {
+    return WBSService.saveWBSItem(payload);
+  }, "apiSaveWBSItem");
+}
+
+function apiGetAllUsers() {
+  return safeWebResponse(function() {
+    return UserService.getAllUsers();
+  }, "apiGetAllUsers");
+}
+
+function apiCreateUser(payload) {
+  return safeWebResponse(function() {
+    return UserService.createUser(payload);
+  }, "apiCreateUser");
+}
+
+function apiUpdateUser(userId, payload) {
+  return safeWebResponse(function() {
+    return UserService.updateUser(sanitizeString(userId), payload);
+  }, "apiUpdateUser");
+}
+
+function apiChangePassword(oldPass, newPass) {
+  return safeWebResponse(function() {
+    return UserService.changePassword(sanitizeString(oldPass), sanitizeString(newPass));
+  }, "apiChangePassword");
 }
 
 function apiExportProjectPdf(projectId) {

@@ -153,6 +153,7 @@
           <div class="input-wrapper">
             <span class="input-icon">🔄</span>
             <input type="password" id="confirmPassword" class="form-input" placeholder="Ketik ulang password baru" required>
+
             <button type="button" class="toggle-password">🔒</button>
           </div>
         </div>
@@ -174,7 +175,7 @@
         <span class="brand-logo-icon">📊</span>
         <div class="brand-name">
           <h2>System Reminder 2</h2>
-          <span class="version-tag">v0.2 Core</span>
+          <span class="version-tag">v1.0.1</span>
         </div>
       </div>
 
@@ -191,14 +192,22 @@
           <span class="nav-icon">📅</span>
           <span>Daily Progress</span>
         </a>
+        <a href="#scurve" class="nav-item" data-tab="scurve">
+          <span class="nav-icon">📈</span>
+          <span>Analitik Kurva S</span>
+        </a>
         <a href="#settings" class="nav-item" data-tab="settings">
           <span class="nav-icon">⚙️</span>
           <span>Settings & Channel</span>
         </a>
+        <a href="#users" class="nav-item" id="navUsersTab" data-tab="users" style="display: none;">
+          <span class="nav-icon">👥</span>
+          <span>Manajemen Pengguna</span>
+        </a>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-profile-badge">
+        <div class="user-profile-badge" onclick="openProfileModal()" style="cursor: pointer;" title="Pengaturan Profil">
           <div class="user-avatar" id="sidebarAvatar">U</div>
           <div class="user-info">
             <div class="user-name" id="sidebarUserName">User</div>
@@ -389,7 +398,58 @@
           </div>
         </section>
 
-        <!-- TAB 4: SETTINGS & CHANNELS -->
+        <!-- TAB 4: S-CURVE ANALYTICS -->
+        <section class="tab-pane" id="tabScurve">
+          <div class="panel">
+            <div class="panel-header flex-wrap gap-3">
+              <h2 class="panel-title">Time Schedule & Kurva S (WBS)</h2>
+              <div class="filter-actions flex-wrap gap-2">
+                <select id="sCurveProjectSelect" class="form-select" onchange="loadWBSData(this.value)">
+                  <option value="">-- Pilih Proyek --</option>
+                </select>
+                <select id="periodScaleSelect" class="form-select" onchange="loadWBSData()">
+                  <option value="DAILY">Harian</option>
+                  <option value="WEEKLY" selected>Mingguan</option>
+                  <option value="MONTHLY">Bulanan</option>
+                </select>
+                <button type="button" class="btn btn-primary" onclick="openWbsModal()">
+                  <span>+ Tambah Item Pekerjaan</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="panel-content" style="padding: 24px;">
+              <div id="sCurveEmptyState" class="text-center py-4" style="color: var(--text-muted);">
+                Silakan pilih proyek di atas untuk memuat Time Schedule & Kurva S.
+              </div>
+              <div id="sCurveContainer" class="hidden">
+                <!-- CHART JS WRAPPER -->
+                <div style="position: relative; height: 400px; width: 100%; margin-bottom: 30px;">
+                  <canvas id="sCurveChart"></canvas>
+                </div>
+                
+                <!-- WBS TABLE (GANTT HYBRID) -->
+                <div class="table-responsive">
+                  <table class="data-table" id="wbsTable">
+                    <thead>
+                      <tr id="wbsTableHeader">
+                        <!-- Akan diisi secara dinamis oleh JS -->
+                      </tr>
+                    </thead>
+                    <tbody id="wbsTableBody">
+                       <!-- Akan diisi secara dinamis oleh JS -->
+                    </tbody>
+                    <tfoot id="wbsTableFooter" style="background: rgba(255,255,255,0.02); font-weight: 600;">
+                       <!-- Baris Bobot Rencana, Aktual, dsb -->
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: SETTINGS & CHANNELS -->
         <section class="tab-pane" id="tabSettings">
           <div class="settings-grid">
             <!-- WhatsApp Test Card -->
@@ -438,15 +498,126 @@
           </div>
         </section>
 
+        <!-- TAB 6: MANAJEMEN PENGGUNA -->
+        <section class="tab-pane" id="tabUsers">
+          <div class="panel">
+            <div class="panel-header flex-wrap gap-2">
+              <h2 class="panel-title">👥 Daftar Pengguna Sistem</h2>
+              <div class="panel-actions">
+                <button type="button" class="btn btn-primary" onclick="openUserModal()">+ Tambah Pengguna</button>
+              </div>
+            </div>
+            <div class="table-responsive" style="margin-top: 16px;">
+              <table class="data-table" id="usersTable">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Terakhir Login</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <!-- Data diisi via script -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
       </div>
     </main>
   </div>
 
   <!-- ========================================== -->
-  <!-- MODALS -->
+  <!-- 3. GLOBAL MODALS OVERLAYS -->
   <!-- ========================================== -->
 
-  <!-- 1. MODAL CREATE PROJECT -->
+  <!-- Modal Pengaturan Profil -->
+  <div class="modal-backdrop hidden" id="profileModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙️ Pengaturan Profil</h3>
+        <button class="btn-close" onclick="closeModal('profileModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="profileForm" onsubmit="event.preventDefault(); submitProfileUpdate();">
+          <!-- Untuk sekarang, kita ganti nama (avatar menyesuaikan inisial) dan password -->
+          <div class="form-group">
+            <label class="form-label">Email (Read Only)</label>
+            <input type="email" id="profEmail" class="form-input" disabled>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <input type="text" id="profRole" class="form-input" disabled>
+          </div>
+        </form>
+        
+        <hr style="border:1px solid rgba(255,255,255,0.05); margin: 20px 0;">
+        
+        <h4 style="color: var(--text-main); margin-bottom: 12px; font-weight:600;">Ubah Password</h4>
+        <form id="profilePasswordForm" onsubmit="event.preventDefault(); submitPasswordChange();">
+          <div class="form-group">
+            <label class="form-label" for="profOldPassword">Password Lama</label>
+            <input type="password" id="profOldPassword" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profNewPassword">Password Baru (Sesuai POL.ISMS.001)</label>
+            <input type="password" id="profNewPassword" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profConfirmPassword">Konfirmasi Password Baru</label>
+            <input type="password" id="profConfirmPassword" class="form-input" required>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Ubah Password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Tambah/Edit User -->
+  <div class="modal-backdrop hidden" id="userModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="userModalTitle">Tambah Pengguna Baru</h3>
+        <button class="btn-close" onclick="closeModal('userModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="userForm" onsubmit="event.preventDefault(); submitUser();">
+          <div class="form-group">
+            <label class="form-label" for="umEmail">Email Google Workspace</label>
+            <input type="email" id="umEmail" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="umUsername">Username (Unik)</label>
+            <input type="text" id="umUsername" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="umPassword">Password Sementara</label>
+            <input type="text" id="umPassword" class="form-input" required placeholder="User wajib mengganti saat login pertama">
+            <small style="color:var(--text-muted);">Sesuai kebijakan, gunakan kombinasi huruf, angka, dan karakter khusus.</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="umRole">Role / Hak Akses</label>
+            <select id="umRole" class="form-select" required>
+              <option value="REGULAR_USER">Regular User</option>
+              <option value="PROJECT_MANAGER">Project Manager</option>
+              <option value="AUDITOR">Auditor</option>
+              <option value="ADMINISTRATOR">Administrator</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeModal('userModal')">Batal</button>
+            <button type="submit" class="btn btn-primary">Simpan Pengguna</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Tambah Proyek Baru -->
   <div class="modal-backdrop hidden" id="createProjectModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -511,9 +682,17 @@
       <form id="recordProgressForm" onsubmit="handleRecordProgress(event)">
         <div class="form-group">
           <label class="form-label" for="progModalProject">Pilih Proyek *</label>
-          <select id="progModalProject" class="form-select" required>
+          <select id="progModalProject" class="form-select" onchange="populateProgressWbsDropdown(this.value)" required>
             <option value="">-- Pilih Proyek --</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="progModalWbs">Pilih Item Pekerjaan (WBS)</label>
+          <select id="progModalWbs" class="form-select">
+            <option value="">-- Seluruh Proyek (Umum) --</option>
+          </select>
+          <small style="color:var(--text-muted);">Pilih item pekerjaan jika Anda ingin melaporkan progres spesifik per item.</small>
         </div>
 
         <div class="grid-2">
@@ -542,25 +721,49 @@
 
   <!-- 3. MODAL S-CURVE VISUALIZER -->
   <div class="modal-backdrop hidden" id="curveModal">
-    <div class="modal-card modal-lg">
+    <!-- Kurva S Modal Removed (Pindah ke Tab) -->
+  </div>
+
+  <!-- 4. MODAL TAMBAH WBS ITEM -->
+  <div class="modal-backdrop hidden" id="wbsModal">
+    <div class="modal-card">
       <div class="modal-header">
-        <div>
-          <h3 class="modal-title" id="curveModalTitle">Visualisasi Kurva S Proyek</h3>
-          <p class="modal-subtitle" id="curveModalSubtitle">Perbandingan kurva rencana terhadap realisasi progres aktual</p>
-        </div>
-        <button type="button" class="btn-close" onclick="closeModal('curveModal')">×</button>
+        <h3 class="modal-title">Tambah Item Pekerjaan (WBS)</h3>
+        <button class="btn-close" onclick="closeModal('wbsModal')">&times;</button>
       </div>
-
-      <div class="curve-container">
-        <canvas id="curveCanvas" width="700" height="320"></canvas>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline" onclick="closeModal('curveModal')">Tutup</button>
+      <div class="modal-body">
+        <form id="wbsForm" onsubmit="event.preventDefault(); submitWbsItem();">
+          <input type="hidden" id="wbsProjectId">
+          <div class="form-group">
+            <label class="form-label" for="wbsTaskName">Keterangan Pekerjaan *</label>
+            <input type="text" id="wbsTaskName" class="form-input" placeholder="Contoh: Pekerjaan Pondasi" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="wbsWeight">Bobot Rencana (%) *</label>
+            <input type="number" step="0.01" min="0" max="100" id="wbsWeight" class="form-input" placeholder="Contoh: 15.5" required>
+          </div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label" for="wbsStartDate">Tanggal Mulai *</label>
+              <input type="date" id="wbsStartDate" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="wbsEndDate">Tanggal Selesai *</label>
+              <input type="date" id="wbsEndDate" class="form-input" required>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeModal('wbsModal')">Batal</button>
+            <button type="submit" class="btn btn-primary">Simpan Item</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 
+  <!-- Chart.js Library -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <?!= include('script'); ?>
 </body>
 </html>

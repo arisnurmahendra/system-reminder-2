@@ -246,7 +246,15 @@ function safeWebResponse(callbackFn, contextName) {
   }
   
   try {
-    var result = callbackFn();
+    var rawResult = callbackFn();
+    
+    // SANITIZATION KRITIS:
+    // Google Sheets getValues() mengembalikan tipe Date asli. 
+    // google.script.run akan mengembalikan 'undefined' di frontend jika ada objek Date atau tidak serializable.
+    // JSON.stringify otomatis mengonversi Date menjadi ISO string.
+    var result = (rawResult !== undefined && rawResult !== null) 
+                 ? JSON.parse(JSON.stringify(rawResult)) 
+                 : rawResult;
     
     if (typeof viewLog !== "undefined" && viewLog) {
       console.log("✅ [REQUEST SUCCESS] Berhasil: " + ctx);

@@ -1,6 +1,6 @@
 ![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?logo=google&logoColor=white)
 ![Status](https://img.shields.io/badge/status-active-success)
-![Version](https://img.shields.io/badge/version-v1.0.0-blue)
+![Version](https://img.shields.io/badge/version-v1.0.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://img.shields.io/badge/tests-145%2F145%20passed-brightgreen)
 
@@ -192,22 +192,6 @@ Gunakan kredensial berikut untuk mencoba fungsionalitas sistem jika Anda sudah m
 
 > [!WARNING]
 > Sangat disarankan untuk segera mengubah password default `admin` jika sistem akan digunakan pada ranah *production*.
-
-
-Administrator
-    USER LOGIN : admin
-    EMAIL : admin@system.local
-    PASSWORD: admin123
-
-Project Manager
-    USER LOGIN : manager
-    EMAIL : manager@system.local
-    PASSWORD: password123
-
-Auditor
-    USER LOGIN : auditor
-    EMAIL : auditor@system.local
-    PASSWORD: password123
 
 ## © Lisensi
 Proyek ini dilisensikan di bawah Lisensi MIT - silakan lihat berkas [LICENSE](LICENSE) untuk rinciannya.

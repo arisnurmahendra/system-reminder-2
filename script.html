@@ -73,11 +73,12 @@
     showLoading("Memverifikasi sesi pengguna...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
-        if (response && response.success && response.data && response.data.authenticated) {
+        if (response && response.success && response.data && response.data.isAuthenticated) {
           AppState.isAuthenticated = true;
-          AppState.currentUser = response.data;
-          sessionStorage.setItem('sysrem_session', JSON.stringify(response.data));
+          AppState.currentUser = response.data.user;
+          sessionStorage.setItem('sysrem_session', JSON.stringify(response.data.user));
           renderAuthenticatedApp();
           resetIdleTimer();
         } else {
@@ -85,6 +86,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         hideLoading();
         renderAuthScreen();
       })
@@ -108,10 +110,23 @@
       document.getElementById('sidebarAvatar').textContent = initial;
       document.getElementById('sidebarUserName').textContent = email.split('@')[0];
       document.getElementById('sidebarUserRole').textContent = AppState.currentUser.role || "MEMBER";
+
+      const navUsersTab = document.getElementById('navUsersTab');
+      if (navUsersTab) {
+        if (AppState.currentUser.role === "ADMINISTRATOR") {
+          navUsersTab.style.display = "flex";
+        } else {
+          navUsersTab.style.display = "none";
+        }
+      }
     }
 
     loadDashboardSummary();
     loadProjects();
+    
+    if (AppState.currentUser && AppState.currentUser.role === "ADMINISTRATOR") {
+      loadUsers();
+    }
   }
 
   // Handle Login Form Submit
@@ -124,6 +139,7 @@
       const totpToken = document.getElementById('totpToken') ? document.getElementById('totpToken').value.trim() : "";
 
       showLoading("Memvalidasi kredensial login...");
+      logDebug("⏳", "Memanggil apiLogin via GAS...");
 
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
         setTimeout(() => {
@@ -138,16 +154,18 @@
 
       google.script.run
         .withSuccessHandler((response) => {
+          logDebug("✅", "GAS Response OK:", response);
           hideLoading();
           if (response.success) {
             AppState.isAuthenticated = true;
-            AppState.currentUser = response.data;
-            if (response.data.mustChangePassword) {
+            if (response.data.status === "REQUIRE_PASSWORD_CHANGE") {
+              AppState.currentUser = response.data;
               document.getElementById('loginCard').classList.add('hidden');
               document.getElementById('changePasswordCard').classList.remove('hidden');
               showToast("Wajib mengganti password default Anda.", "info");
             } else {
-              sessionStorage.setItem('sysrem_session', JSON.stringify(response.data));
+              AppState.currentUser = response.data.user;
+              sessionStorage.setItem('sysrem_session', JSON.stringify(response.data.user));
               showToast("Login berhasil! Selamat datang.", "success");
               renderAuthenticatedApp();
               resetIdleTimer();
@@ -157,6 +175,7 @@
           }
         })
         .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
           hideLoading();
           showToast(err.message || "Terjadi kesalahan sistem.", "error");
         })
@@ -183,6 +202,7 @@
 
       google.script.run
         .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
           hideLoading();
           if (response.success) {
             showToast("Password berhasil diperbarui. Silakan login kembali.", "success");
@@ -196,6 +216,7 @@
           }
         })
         .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
           hideLoading();
           showToast(err.message || "Terjadi kesalahan sistem.", "error");
         })
@@ -298,6 +319,20 @@
   function loadProjects() {
     const statusFilter = document.getElementById('projectStatusFilter') ? document.getElementById('projectStatusFilter').value : "";
     
+    // Tampilkan skeleton loader di tabel saat memulai request
+    const projectListBody = document.getElementById('projectListTableBody');
+    const overviewBody = document.getElementById('overviewProjectTableBody');
+    const skeletonHtml = `
+      <tr>
+        <td colspan="8" class="text-center py-4">
+          <div class="skeleton-loader skeleton-row"></div>
+          <div class="skeleton-loader skeleton-row" style="width: 80%; margin: 0 auto;"></div>
+        </td>
+      </tr>
+    `;
+    if (projectListBody) projectListBody.innerHTML = skeletonHtml;
+    if (overviewBody) overviewBody.innerHTML = skeletonHtml;
+
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
       renderProjectTables(getMockProjects());
       return;
@@ -306,6 +341,7 @@
     logDebug("⏳", "Memuat data proyek...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         if (response && response.success) {
           logDebug("✅", "Data proyek berhasil dimuat", response.data);
           AppState.projects = response.data || [];
@@ -318,6 +354,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         showToast(err.message || "Terjadi kesalahan sistem.", "error");
         renderProjectTables([]);
       })
@@ -330,8 +367,10 @@
       return;
     }
 
+    logDebug("⏳", "Memuat ringkasan dashboard (apiGetDashboardExecutiveSummary)...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         if (response && response.success && response.data) {
           const sum = response.data;
           document.getElementById('kpiTotalProjects').textContent = sum.activeProjects;
@@ -343,6 +382,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         showToast(err.message || "Gagal memuat ringkasan dashboard.", "error");
       })
       .apiGetDashboardExecutiveSummary();
@@ -381,16 +421,19 @@
 
     // 1. Overview Table
     if (overviewBody) {
-      overviewBody.innerHTML = projects.map((p) => {
-        const s = p.summary || { plannedProgress: 0, actualProgress: 0, deviation: 0, status: p.status };
+      overviewBody.innerHTML = projects.map((item) => {
+        const p = item.project || item;
+        const s = item.summary || { plannedProgress: 0, actualProgress: 0, deviation: 0, status: p.status };
         const statusBadge = getStatusBadgeHtml(s.status || p.status);
         const devClass = s.deviation < 0 ? 'color: var(--accent-red); font-weight: 600;' : 'color: var(--accent-green);';
+        const startLocal = formatDateLocal(p.start_date);
+        const endLocal = formatDateLocal(p.end_date);
 
         return `
           <tr>
-            <td><strong>${p.project_name}</strong></td>
-            <td>${p.pic_name}<br><small style="color: var(--text-muted);">${p.pic_email}</small></td>
-            <td><small>${p.start_date}<br>${p.end_date}</small></td>
+            <td><strong>${p.project_name || '-'}</strong></td>
+            <td>${p.pic_name || '-'}<br><small style="color: var(--text-muted);">${p.pic_email || '-'}</small></td>
+            <td><small>${startLocal}<br>${endLocal}</small></td>
             <td>${s.plannedProgress}%</td>
             <td><strong>${s.actualProgress}%</strong></td>
             <td style="${devClass}">${s.deviation > 0 ? '+' : ''}${s.deviation}%</td>
@@ -405,19 +448,22 @@
 
     // 2. Project Management Table
     if (projectListBody) {
-      projectListBody.innerHTML = projects.map((p) => {
+      projectListBody.innerHTML = projects.map((item) => {
+        const p = item.project || item;
         const statusBadge = getStatusBadgeHtml(p.status);
         const emailIcon = p.is_email_active ? '📧 On' : '📧 Off';
         const waIcon = p.is_wa_active ? '💬 On' : '💬 Off';
+        const startLocal = formatDateLocal(p.start_date);
+        const endLocal = formatDateLocal(p.end_date);
 
         return `
           <tr>
             <td>
-              <strong>${p.project_name}</strong><br>
-              <small style="color: var(--text-muted);">${p.project_id}</small>
+              <strong>${p.project_name || '-'}</strong><br>
+              <small style="color: var(--text-muted);">${p.project_id || '-'}</small>
             </td>
-            <td>${p.pic_name} (${p.pic_phone || '-'})</td>
-            <td><small>${p.start_date} s.d. ${p.end_date}</small></td>
+            <td>${p.pic_name || '-'} (${p.pic_phone || '-'})</td>
+            <td><small>${startLocal} s.d. ${endLocal}</small></td>
             <td><small>${emailIcon} | ${waIcon}</small></td>
             <td>${statusBadge}</td>
             <td style="text-align: right;">
@@ -446,7 +492,8 @@
 
   function handleProjectSearch(keyword) {
     const clean = keyword.toLowerCase();
-    const filtered = AppState.projects.filter((p) => {
+    const filtered = AppState.projects.filter((item) => {
+      const p = item.project || item;
       return (p.project_name && p.project_name.toLowerCase().includes(clean)) ||
              (p.pic_name && p.pic_name.toLowerCase().includes(clean)) ||
              (p.pic_email && p.pic_email.toLowerCase().includes(clean));
@@ -455,14 +502,33 @@
   }
 
   function populateProjectDropdowns() {
-    const selects = [document.getElementById('progressProjectSelect'), document.getElementById('progModalProject')];
+    const selects = [
+      document.getElementById('progressProjectSelect'), 
+      document.getElementById('progModalProject'),
+      document.getElementById('sCurveProjectSelect')
+    ];
     selects.forEach((sel) => {
       if (!sel) return;
       const currentVal = sel.value;
       sel.innerHTML = '<option value="">-- Pilih Proyek --</option>' +
-        AppState.projects.map((p) => `<option value="${p.project_id}">${p.project_name}</option>`).join('');
+        AppState.projects.map((item) => {
+          const p = item.project || item;
+          return `<option value="${p.project_id || ''}">${p.project_name || 'Tanpa Nama'}</option>`;
+        }).join('');
       if (currentVal) sel.value = currentVal;
     });
+
+    // Populate Status Filter dynamically
+    const statusFilter = document.getElementById('projectStatusFilter');
+    if (statusFilter) {
+      const currentFilter = statusFilter.value;
+      const uniqueStatuses = [...new Set(AppState.projects.map((item) => (item.project || item).status).filter(Boolean))];
+      statusFilter.innerHTML = '<option value="">Semua Status</option>' +
+        uniqueStatuses.map(s => `<option value="${s}">${s}</option>`).join('');
+      if (currentFilter && uniqueStatuses.includes(currentFilter)) {
+        statusFilter.value = currentFilter;
+      }
+    }
   }
 
   // ==========================================
@@ -477,14 +543,29 @@
 
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
       renderProgressLogsTable([
-        { date: "2026-03-01", planned_progress: 15, actual_progress: 15, deviation: 0, notes: "Pondasi awal", recorded_by: "admin@test" }
+        { report_date: "2026-03-01", planned_progress: 15, actual_progress: 15, deviation: 0, notes: "Pondasi awal", recorded_by: "admin@test" }
       ]);
       return;
     }
 
+    const tbody = document.getElementById('progressLogsTableBody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center py-4">
+            <div class="skeleton-loader skeleton-row"></div>
+            <div class="skeleton-loader skeleton-row" style="width: 80%; margin: 0 auto;"></div>
+          </td>
+        </tr>
+      `;
+    }
+
     showLoading("Memuat riwayat progres harian...");
+    logDebug("⏳", "Memanggil apiGetProgressHistory untuk proyek:", projectId);
+    
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
           renderProgressLogsTable(response.data || []);
@@ -502,9 +583,10 @@
 
     tbody.innerHTML = logs.map((l) => {
       const devClass = l.deviation < 0 ? 'color: var(--accent-red); font-weight: 600;' : 'color: var(--accent-green);';
+      const localDate = formatDateLocal(l.report_date || l.date);
       return `
         <tr>
-          <td><strong>${l.date}</strong></td>
+          <td><strong>${localDate}</strong></td>
           <td>${l.planned_progress}%</td>
           <td><strong>${l.actual_progress}%</strong></td>
           <td style="${devClass}">${l.deviation > 0 ? '+' : ''}${l.deviation}%</td>
@@ -518,80 +600,180 @@
     }).join('');
   }
 
-  function viewProjectCurve(projectId) {
-    showLoading("Menghitung titik koordinat Kurva S...");
-    if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      hideLoading();
-      drawMockCurve();
-      openModal('curveModal');
+  let sCurveChartInst = null;
+
+  function loadWBSData(projectId) {
+    const select = document.getElementById('sCurveProjectSelect');
+    if (!projectId && select) projectId = select.value;
+    if (select && select.value !== projectId) select.value = projectId;
+
+    if (!projectId) {
+      document.getElementById('sCurveEmptyState').classList.remove('hidden');
+      document.getElementById('sCurveContainer').classList.add('hidden');
       return;
     }
 
+    const scale = document.getElementById('periodScaleSelect').value;
+
+    document.getElementById('sCurveEmptyState').classList.add('hidden');
+    document.getElementById('sCurveContainer').classList.remove('hidden');
+
+    // Kosongkan tabel
+    const thead = document.getElementById('wbsTableHeader');
+    const tbody = document.getElementById('wbsTableBody');
+    const tfoot = document.getElementById('wbsTableFooter');
+    if(thead) thead.innerHTML = '';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center">Memuat data WBS...</td></tr>';
+    if(tfoot) tfoot.innerHTML = '';
+
+    showLoading("Memuat Time Schedule WBS...");
+    
     google.script.run
       .withSuccessHandler((response) => {
         hideLoading();
-        if (response && response.project) {
-          document.getElementById('curveModalTitle').textContent = "Kurva S: " + response.project.project_name;
-          drawSCurveChart(response.plannedCurve, response.actualLogs);
-          openModal('curveModal');
+        if (response && response.success) {
+          renderWbsTableAndChart(response.data);
+        } else {
+          showToast(response.error ? response.error.message : "Gagal memuat WBS", "error");
         }
       })
-      .apiGetProjectCurveData(projectId, "SCURVE");
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Kesalahan jaringan", "error");
+      })
+      .apiGetProjectWBSAndSchedule(projectId, scale);
   }
 
-  function drawSCurveChart(plannedPoints, actualLogs) {
-    const canvas = document.getElementById('curveCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function renderWbsTableAndChart(data) {
+    const thead = document.getElementById('wbsTableHeader');
+    const tbody = document.getElementById('wbsTableBody');
+    const tfoot = document.getElementById('wbsTableFooter');
 
-    // Draw Grid
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.lineWidth = 1;
-    for (let y = 40; y <= 280; y += 60) {
-      ctx.beginPath();
-      ctx.moveTo(40, y);
-      ctx.lineTo(660, y);
-      ctx.stroke();
-    }
+    // 1. Render Header
+    let headHtml = `<th>No</th><th>Keterangan</th><th>Bobot (%)</th><th>Tanggal</th>`;
+    data.periods.forEach(p => {
+      headHtml += `<th>${p}</th>`;
+    });
+    headHtml += `<th>Aksi</th>`;
+    thead.innerHTML = headHtml;
 
-    // Draw Planned S-Curve (Cyan)
-    if (plannedPoints && plannedPoints.length > 0) {
-      ctx.strokeStyle = "#06b6d4";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-
-      plannedPoints.forEach((pt, idx) => {
-        const x = 50 + (idx / (plannedPoints.length - 1)) * 600;
-        const y = 280 - (pt.plannedProgress / 100) * 240;
-        if (idx === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+    // 2. Render Body (WBS Items)
+    if (data.wbs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="${data.periods.length + 5}" class="text-center py-4">Belum ada item WBS.</td></tr>`;
+    } else {
+      let bodyHtml = '';
+      data.wbs.forEach((item, index) => {
+        let rowHtml = `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${item.task_name}</td>
+            <td>${item.weight}%</td>
+            <td><small>${formatDateLocal(item.start_date)} - ${formatDateLocal(item.end_date)}</small></td>
+        `;
+        item.distribution.forEach(val => {
+          rowHtml += `<td>${val > 0 ? val.toFixed(2) : '-'}</td>`;
+        });
+        rowHtml += `
+            <td>
+              <button class="btn btn-sm btn-outline" style="color:var(--accent-red);" onclick="deleteWbsItem('${item.wbs_id}')">Hapus</button>
+            </td>
+          </tr>
+        `;
+        bodyHtml += rowHtml;
       });
-      ctx.stroke();
+      tbody.innerHTML = bodyHtml;
     }
 
-    // Draw Labels & Legend
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "12px Inter";
-    ctx.fillText("0%", 10, 285);
-    ctx.fillText("50%", 10, 165);
-    ctx.fillText("100%", 10, 45);
+    // 3. Render Footer (Summary)
+    const sum = data.summary;
+    let footHtml = `
+      <tr><td colspan="4" class="text-right"><strong>Bobot Rencana</strong></td>${sum.bobot_rencana.map(v => `<td>${v.toFixed(2)}</td>`).join('')}<td></td></tr>
+      <tr><td colspan="4" class="text-right" style="color:#ef4444;"><strong>Akumulasi Rencana</strong></td>${sum.akumulasi_rencana.map(v => `<td style="color:#ef4444;">${v.toFixed(2)}</td>`).join('')}<td></td></tr>
+      <tr><td colspan="4" class="text-right"><strong>Bobot Pelaksanaan</strong></td>${sum.bobot_pelaksanaan.map(v => `<td>${v.toFixed(2)}</td>`).join('')}<td></td></tr>
+      <tr><td colspan="4" class="text-right" style="color:#10b981;"><strong>Akumulasi Pelaksanaan</strong></td>${sum.akumulasi_pelaksanaan.map(v => `<td style="color:#10b981;">${v.toFixed(2)}</td>`).join('')}<td></td></tr>
+      <tr><td colspan="4" class="text-right"><strong>Deviasi</strong></td>${sum.deviasi.map(v => `<td style="${v < 0 ? 'color:#ef4444;' : 'color:#10b981;'}">${v > 0 ? '+' : ''}${v.toFixed(2)}</td>`).join('')}<td></td></tr>
+    `;
+    tfoot.innerHTML = footHtml;
 
-    ctx.fillStyle = "#06b6d4";
-    ctx.fillText("— Kurva Rencana (S-Curve)", 500, 30);
+    // 4. Render Chart
+    drawSCurveChartWBS(data.periods, sum.akumulasi_rencana, sum.akumulasi_pelaksanaan);
   }
 
-  function drawMockCurve() {
-    const canvas = document.getElementById('curveCanvas');
+  function drawSCurveChartWBS(labels, plannedData, actualData) {
+    const canvas = document.getElementById('sCurveChart');
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#06b6d4";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(50, 280);
-    ctx.bezierCurveTo(200, 270, 400, 50, 650, 40);
-    ctx.stroke();
+    
+    if (sCurveChartInst) {
+      sCurveChartInst.destroy();
+    }
+
+    sCurveChartInst = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Aktual (Line Hijau)',
+            data: actualData,
+            borderColor: '#10b981', // Hijau
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Rencana (S-Curve Merah)',
+            data: plannedData,
+            borderColor: '#ef4444', // Merah
+            borderWidth: 3,
+            borderDash: [5, 5],
+            tension: 0.4,
+            fill: false,
+            yAxisID: 'y'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: '#f8fafc', font: { family: 'Inter' } }
+          },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8' }
+          },
+          y: {
+            min: 0,
+            max: 100,
+            position: 'right', // Sumbu Y skala 0-100% dikanan sesuai request
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8', callback: function(value) { return value + '%'; } },
+            title: { display: true, text: 'Scale 0-100%', color: '#94a3b8'}
+          }
+        }
+      }
+    });
+  }
+
+  function openRecordProgressModalFromSCurve() {
+    const sCurveSelect = document.getElementById('sCurveProjectSelect');
+    const modalSelect = document.getElementById('progModalProject');
+    
+    if (sCurveSelect && sCurveSelect.value && modalSelect) {
+      modalSelect.value = sCurveSelect.value;
+    }
+    
+    document.getElementById('recordProgressForm').reset();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('progModalDate').value = today;
+    openModal('recordProgressModal');
   }
 
   // ==========================================
@@ -614,6 +796,13 @@
   }
 
   function openRecordProgressModal() {
+    const mainSelect = document.getElementById('progressProjectSelect');
+    const modalSelect = document.getElementById('progModalProject');
+    
+    if (mainSelect && mainSelect.value && modalSelect) {
+      modalSelect.value = mainSelect.value;
+    }
+    
     document.getElementById('recordProgressForm').reset();
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('progModalDate').value = today;
@@ -635,8 +824,10 @@
     };
 
     showLoading("Mendaftarkan proyek baru...");
+    logDebug("⏳", "Memanggil apiRegisterProject...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
           showToast("Proyek berhasil didaftarkan!", "success");
@@ -647,6 +838,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         hideLoading();
         showToast(err.message || "Error saat pendaftaran proyek.", "error");
       })
@@ -657,6 +849,7 @@
     event.preventDefault();
     const payload = {
       projectId: document.getElementById('progModalProject').value,
+      wbsId: document.getElementById('progModalWbs') ? document.getElementById('progModalWbs').value : "",
       date: document.getElementById('progModalDate').value,
       actualProgress: Number(document.getElementById('progModalActual').value),
       notes: document.getElementById('progModalNotes').value.trim(),
@@ -664,8 +857,10 @@
     };
 
     showLoading("Mencatat progres harian...");
+    logDebug("⏳", "Memanggil apiRecordDailyProgress...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
           showToast("Progres harian berhasil dicatat!", "success");
@@ -677,6 +872,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         hideLoading();
         showToast(err.message || "Error saat mencatat progres.", "error");
       })
@@ -688,6 +884,7 @@
       showLoading("Menghapus proyek...");
       google.script.run
         .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
           hideLoading();
           if (response && response.success) {
             showToast("Proyek berhasil dihapus.", "success");
@@ -703,6 +900,7 @@
       showLoading("Menghapus log...");
       google.script.run
         .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
           hideLoading();
           if (response && response.success) {
             showToast("Log progres dihapus.", "success");
@@ -722,6 +920,7 @@
 
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success && response.data.sent) {
           showToast("Pesan uji coba berhasil terkirim ke WhatsApp!", "success");
@@ -730,6 +929,7 @@
         }
       })
       .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
         hideLoading();
         showToast("Error pengiriman WA: " + err.message, "error");
       })
@@ -740,6 +940,7 @@
     showLoading("Menjalankan sinkronisasi dan evaluasi pengingat...");
     google.script.run
       .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
           showToast(`Sweep selesai! Total: ${response.data.totalEvaluated}, Terlambat: ${response.data.delayedCount}, Terkirim: ${response.data.notificationsSent}`, "success");
@@ -758,6 +959,7 @@
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run
         .withSuccessHandler((response) => {
+        logDebug("✅", "GAS Response OK:", response);
           hideLoading();
           if (response && response.success) {
             showToast("Berhasil: Semua akses skrip telah dicabut.", "success");
@@ -767,6 +969,7 @@
           }
         })
         .withFailureHandler((err) => {
+        logDebug("❌", "GAS Response ERROR:", err);
           hideLoading();
           showToast(err.message || "Terjadi kesalahan sistem.", "error");
         })
@@ -782,6 +985,17 @@
   // ==========================================
   // UTILITIES & PASSWORD POLICY
   // ==========================================
+
+  function formatDateLocal(isoString) {
+    if (!isoString || isoString === '-') return '-';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) {
+      return isoString;
+    }
+  }
 
   function showLoading(msg) {
     const el = document.getElementById('globalLoading');
@@ -863,4 +1077,198 @@
       }
     ];
   }
+  // ==========================================
+  // 6. USER MANAGEMENT & PROFILE SETTINGS
+  // ==========================================
+
+  function openProfileModal() {
+    if (!AppState.currentUser) return;
+    document.getElementById('profEmail').value = AppState.currentUser.email;
+    document.getElementById('profRole').value = AppState.currentUser.role;
+    document.getElementById('profilePasswordForm').reset();
+    openModal('profileModal');
+  }
+
+  function submitProfileUpdate() {
+    // Fungsi dummy, sementara kita hanya mendukung ganti password melalui form kedua
+    showToast("Profil hanya bisa diubah melalui halaman ganti password.", "info");
+  }
+
+  function submitPasswordChange() {
+    const oldPass = document.getElementById('profOldPassword').value;
+    const newPass = document.getElementById('profNewPassword').value;
+    const confPass = document.getElementById('profConfirmPassword').value;
+
+    if (newPass !== confPass) {
+      showToast("Konfirmasi password baru tidak cocok.", "error");
+      return;
+    }
+
+    showLoading("Menyimpan password baru...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Password berhasil diubah.", "success");
+          closeModal('profileModal');
+          document.getElementById('profilePasswordForm').reset();
+        } else {
+          showToast(response.error ? response.error.message : "Gagal mengubah password.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Kesalahan koneksi ke server.", "error");
+      })
+      .apiChangePassword(oldPass, newPass);
+  }
+
+  function loadUsers() {
+    if (!AppState.currentUser || AppState.currentUser.role !== "ADMINISTRATOR") return;
+    
+    const tbody = document.getElementById('usersTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="skeleton-loader skeleton-row"></div></td></tr>';
+
+    google.script.run
+      .withSuccessHandler((response) => {
+        if (response && response.success) {
+          renderUsersTable(response.data);
+        }
+      })
+      .apiGetAllUsers();
+  }
+
+  function renderUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
+
+    if (!users || users.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Belum ada pengguna.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+      const activeBadge = u.is_active ? '<span class="status-badge status-active">Aktif</span>' : '<span class="status-badge status-delayed">Nonaktif</span>';
+      const lastLogin = u.last_login_at ? formatDateLocal(u.last_login_at) : "Belum pernah";
+      return `
+        <tr>
+          <td><strong>${u.username}</strong></td>
+          <td>${u.email}</td>
+          <td>${u.role_name}</td>
+          <td>${activeBadge}</td>
+          <td><small class="text-muted">${lastLogin}</small></td>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline" onclick="showToast('Edit pengguna belum diimplementasikan.', 'info')">Edit</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function openUserModal() {
+    document.getElementById('userForm').reset();
+    openModal('userModal');
+  }
+
+  function submitUser() {
+    const payload = {
+      email: document.getElementById('umEmail').value,
+      username: document.getElementById('umUsername').value,
+      password: document.getElementById('umPassword').value,
+      role: document.getElementById('umRole').value
+    };
+
+    showLoading("Menyimpan pengguna baru...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Pengguna berhasil ditambahkan.", "success");
+          closeModal('userModal');
+          loadUsers(); // Refresh tabel
+        } else {
+          showToast(response.error ? response.error.message : "Gagal menambahkan pengguna.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Terjadi kesalahan sistem.", "error");
+      })
+      .apiCreateUser(payload);
+  }
+
+  // ==========================================
+  // 7. WBS MANAGEMENT & PROGRESS
+  // ==========================================
+
+  function openWbsModal() {
+    const projectId = document.getElementById('sCurveProjectSelect').value;
+    if (!projectId) {
+      showToast("Pilih proyek terlebih dahulu", "error");
+      return;
+    }
+    document.getElementById('wbsForm').reset();
+    document.getElementById('wbsProjectId').value = projectId;
+    openModal('wbsModal');
+  }
+
+  function submitWbsItem() {
+    const payload = {
+      project_id: document.getElementById('wbsProjectId').value,
+      task_name: document.getElementById('wbsTaskName').value,
+      weight: document.getElementById('wbsWeight').value,
+      start_date: document.getElementById('wbsStartDate').value,
+      end_date: document.getElementById('wbsEndDate').value
+    };
+
+    showLoading("Menyimpan item WBS...");
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Item berhasil ditambahkan", "success");
+          closeModal('wbsModal');
+          loadWBSData(payload.project_id);
+        } else {
+          showToast(response.error ? response.error.message : "Gagal", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message, "error");
+      })
+      .apiSaveWBSItem(payload);
+  }
+
+  function deleteWbsItem(wbsId) {
+    if (!confirm("Hapus item WBS ini?")) return;
+    showLoading("Menghapus...");
+    // Belum di-expose di Code.gs secara eksplisit, tapi bisa ditambahkan jika perlu.
+    showToast("Fitur hapus belum terhubung.", "info");
+    hideLoading();
+  }
+
+  // Dipanggil ketika select proyek di Modal Progres diubah
+  function populateProgressWbsDropdown(projectId) {
+    const wbsSelect = document.getElementById('progModalWbs');
+    if (!wbsSelect) return;
+    
+    wbsSelect.innerHTML = '<option value="">-- Seluruh Proyek (Umum) --</option>';
+    if (!projectId) return;
+
+    // Untuk simple UI, kita buat panggil api getWBS
+    google.script.run
+      .withSuccessHandler((response) => {
+        if (response && response.success && response.data && response.data.wbs) {
+          response.data.wbs.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.wbs_id;
+            opt.textContent = `${item.task_name} (Bobot: ${item.weight}%)`;
+            wbsSelect.appendChild(opt);
+          });
+        }
+      })
+      .apiGetProjectWBSAndSchedule(projectId, "WEEKLY");
+  }
+
 </script>

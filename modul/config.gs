@@ -42,7 +42,8 @@ var CONFIG = {
       AUDIT_LOGS: "Audit_Logs",
       SYSTEM_CONFIG: "System_Config",
       PROJECTS: "Projects",
-      PROGRESS_LOGS: "Progress_Logs"
+      PROGRESS_LOGS: "Progress_Logs",
+      PROJECT_WBS: "Project_WBS"
     }
   },
 

@@ -116,8 +116,11 @@ var SpreadsheetManager = {
       "is_wa_active", "status", "created_at", "updated_at"
     ];
     schema[CONFIG.SPREADSHEET.SHEETS.PROGRESS_LOGS] = [
-      "progress_id", "project_id", "date", "planned_progress",
+      "progress_id", "project_id", "wbs_id", "date", "planned_progress",
       "actual_progress", "deviation", "notes", "recorded_by", "created_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.PROJECT_WBS] = [
+      "wbs_id", "project_id", "task_name", "weight", "start_date", "end_date", "actual_progress", "created_at"
     ];
     return schema;
   },
@@ -767,6 +770,46 @@ var ProgressLogRepository = (function() {
     },
     delete: function(progressId) {
       return base.deleteById(progressId);
+    },
+    invalidateCache: function() {
+      return base.invalidateCache();
+    }
+  };
+})();
+
+// ============================================================================
+// 7. WBS REPOSITORY
+// ============================================================================
+
+var WBSRepository = (function() {
+  var headers = [
+    "wbs_id", "project_id", "task_name", "weight", 
+    "start_date", "end_date", "actual_progress", "created_at"
+  ];
+  var base = createBaseRepository(CONFIG.SPREADSHEET.SHEETS.PROJECT_WBS, headers, "wbs_id");
+
+  return {
+    findAll: function() {
+      return base.findAll();
+    },
+    findById: function(wbsId) {
+      return base.findById(wbsId);
+    },
+    findByProject: function(projectId) {
+      return base.findByField("project_id", projectId);
+    },
+    insert: function(wbsData) {
+      var id = wbsData.wbs_id || ("wbs_" + Utilities.getUuid());
+      wbsData.wbs_id = id;
+      wbsData.created_at = new Date().toISOString();
+      base.insert(wbsData);
+      return id;
+    },
+    update: function(wbsId, updates) {
+      return base.updateById(wbsId, updates);
+    },
+    delete: function(wbsId) {
+      return base.deleteById(wbsId);
     },
     invalidateCache: function() {
       return base.invalidateCache();
