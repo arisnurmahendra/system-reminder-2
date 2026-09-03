@@ -1,4 +1,12 @@
 <script>
+  // Toggle global untuk debug mode (Console Logging Frontend)
+  const viewLog = true;
+  function logDebug(emoji, msg, data) {
+    if (viewLog) {
+      console.log(`${emoji} [FRONTEND] ${msg}`, data || '');
+    }
+  }
+
   // App State
   const AppState = {
     isAuthenticated: false,
@@ -236,6 +244,7 @@
   }
 
   function switchTab(tabName) {
+    logDebug("🔀", "Beralih ke tab:", tabName);
     AppState.currentTab = tabName;
 
     // Update active nav links
@@ -294,9 +303,11 @@
       return;
     }
 
+    logDebug("⏳", "Memuat data proyek...");
     google.script.run
       .withSuccessHandler((response) => {
         if (response && response.success) {
+          logDebug("✅", "Data proyek berhasil dimuat", response.data);
           AppState.projects = response.data || [];
           renderProjectTables(AppState.projects);
           populateProjectDropdowns();
