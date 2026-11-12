@@ -1,4 +1,17 @@
 <script>
+  function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function(character) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#x27;'}[character];
+    });
+  }
+
+  document.addEventListener('click', function(event) {
+    var button = event.target.closest && event.target.closest('button');
+    if (!button || (!button.type || button.type !== 'submit') && !/(kirim|simpan|retry|scheduler|scheduler|pasang|test|aktifkan)/i.test(button.textContent || '')) return;
+    if (button.dataset.busy === 'true') { event.preventDefault(); return; }
+    button.dataset.busy = 'true'; button.disabled = true; button.dataset.busyLabel = button.textContent;
+    window.setTimeout(function() { button.disabled = false; button.dataset.busy = 'false'; }, 5000);
+  }, true);
   // Toggle global untuk debug mode (Console Logging Frontend)
   const viewLog = true;
   function logDebug(emoji, msg, data) {
@@ -12,6 +25,8 @@
     isAuthenticated: false,
     currentUser: null,
     projects: [],
+    users: [],
+    progressLogs: [],
     selectedProject: null,
     currentTab: 'overview'
   };
@@ -22,19 +37,270 @@
     setupMobileSidebar();
     setupPasswordToggles();
     setupPasswordPolicyLiveCheck();
+    setupChannelLayout();
+    setupNotificationSettingsLayout();
+    setupNotificationFrequencyFields();
+    setupScheduleActionButtons();
     checkActiveSession();
   });
+
+  function setupChannelLayout() {
+    const waForm = document.getElementById('waTestForm');
+    const adminCard = document.getElementById('notificationAdminCard');
+    if (!waForm || !adminCard) return;
+    const waCard = waForm.closest('.card');
+    const tokenForm = adminCard.querySelector('form[onsubmit*="saveNotificationToken"]');
+    const emailForm = adminCard.querySelector('form[onsubmit*="handleSendTestEmail"]');
+    if (!waCard || !tokenForm || !emailForm || document.getElementById('notificationEmailCard')) return;
+
+    waCard.classList.add('channel-card');
+    const waHeader = waCard.querySelector('.card-title');
+    const waDesc = waCard.querySelector('.card-desc');
+    if (waHeader) waHeader.textContent = '💬 WhatsApp / Fonnte';
+    if (waDesc) waDesc.textContent = 'Konfigurasi provider dan uji pengiriman WhatsApp secara terpisah dari email.';
+
+    const subcards = document.createElement('div');
+    subcards.className = 'channel-subcards';
+    const waSubcard = document.createElement('div');
+    waSubcard.className = 'channel-subcard';
+    waSubcard.appendChild(waForm);
+    const tokenSubcard = document.createElement('div');
+    tokenSubcard.className = 'channel-subcard';
+    tokenSubcard.innerHTML = '<div class="channel-subcard-header"><span class="channel-icon">⚙️</span><div><h4>Token Fonnte API</h4><p>Token disimpan aman di Script Properties dan tidak pernah ditampilkan kembali.</p></div></div>';
+    tokenSubcard.appendChild(tokenForm);
+    subcards.appendChild(tokenSubcard);
+    subcards.appendChild(waSubcard);
+    waCard.appendChild(subcards);
+
+    const emailCard = document.createElement('div');
+    emailCard.id = 'notificationEmailCard';
+    emailCard.className = 'card channel-card';
+    emailCard.innerHTML = '<div class="card-header"><h3 class="card-title">✉️ Email Test</h3><p class="card-desc">Email dikirim melalui GmailApp/MailApp dan tidak bergantung pada token Fonnte.</p></div>';
+    const emailSubcard = document.createElement('div');
+    emailSubcard.className = 'channel-subcard';
+    emailSubcard.innerHTML = '<div class="channel-subcard-header"><span class="channel-icon">✉️</span><div><h4>Uji Integrasi Email</h4><p>Gunakan alamat staging terlebih dahulu sebelum menguji penerima resmi.</p></div></div>';
+    emailSubcard.appendChild(emailForm);
+    emailCard.appendChild(emailSubcard);
+    waCard.parentNode.insertBefore(emailCard, waCard.nextSibling);
+    adminCard.remove();
+  }
+
+  function setupNotificationSettingsLayout() {
+    const card = document.getElementById('recipientRuleCard');
+    if (!card || card.dataset.layoutReady) return;
+    const forms = card.querySelectorAll('form');
+    if (forms.length < 2) return;
+    card.dataset.layoutReady = 'true';
+    const adminCard = document.getElementById('notificationAdminItemCard');
+    if (adminCard) setupAdministrativeItemFields(adminCard);
+    const headerTitle = card.querySelector('.card-title');
+    const headerDesc = card.querySelector('.card-desc');
+    if (headerTitle) headerTitle.textContent = '👥 Recipient Groups & Notification Rules';
+    if (headerDesc) headerDesc.textContent = 'Susun penerima terlebih dahulu, kemudian buat aturan kapan dan melalui channel apa notifikasi dikirim.';
+    const groupHeading = document.createElement('div');
+    groupHeading.className = 'settings-section-heading';
+    groupHeading.innerHTML = '<span class="section-step">1</span><div><h4>Recipient Group</h4><p>Atur penerima email To/CC/BCC dan nomor WhatsApp. Group dapat digunakan ulang oleh beberapa rule.</p></div>';
+    forms[0].parentNode.insertBefore(groupHeading, forms[0]);
+    const ruleHeading = document.createElement('div');
+    ruleHeading.className = 'settings-section-heading settings-section-heading-rule';
+    ruleHeading.innerHTML = '<span class="section-step">2</span><div><h4>Notification Rule &amp; Schedule</h4><p>Tentukan event, frekuensi, waktu, template, dan group penerima yang digunakan.</p></div>';
+    forms[1].parentNode.insertBefore(ruleHeading, forms[1]);
+    const help = document.createElement('div');
+    help.className = 'settings-help-banner';
+    help.innerHTML = '<strong>Alur penggunaan:</strong> Simpan group → salin Group ID → pilih event dan jadwal → simpan rule. Untuk rule administrasi, Project ID boleh dikosongkan.';
+    card.querySelector('.card-header').after(help);
+    document.querySelectorAll('#tabSettings label').forEach(function(label) { label.classList.add('settings-form-label'); });
+    const dedupeInput = document.getElementById('notificationRuleDedupe');
+    const dedupeLabel = dedupeInput && dedupeInput.closest('.form-group') && dedupeInput.closest('.form-group').querySelector('label');
+    if (dedupeLabel) {
+      dedupeLabel.innerHTML = 'Dedupe (menit) <span class="field-tooltip" tabindex="0" data-tooltip="Jeda minimum dalam menit sebelum event dan penerima yang sama boleh menerima notifikasi lagi.">?</span>';
+      dedupeInput.setAttribute('title', 'Jeda minimum sebelum notifikasi event dan penerima yang sama dikirim kembali.');
+    }
+    const tips = {
+      fonnteTokenInput: 'Token rahasia untuk mengirim WhatsApp melalui Fonnte. Disimpan di Script Properties.',
+      waTestPhone: 'Nomor tujuan untuk pesan WhatsApp percobaan.',
+      emailTestRecipient: 'Alamat tujuan untuk email percobaan melalui GmailApp/MailApp.',
+      notificationAdminItemTitle: 'Judul pengingat administrasi yang akan ditampilkan kepada penerima.',
+      notificationAdminItemDescription: 'Detail tindakan atau informasi administrasi yang perlu disampaikan.',
+      notificationAdminItemCategory: 'Kategori administrasi, misalnya COMPLIANCE atau PAYMENT.',
+      notificationAdminItemOwner: 'PIC atau pemilik tindakan administrasi.',
+      notificationAdminItemStatus: 'Status lifecycle item. COMPLETED/CANCELLED menghentikan pengingat.',
+      notificationAdminItemDueDate: 'Tanggal batas waktu administrasi.',
+      notificationAdminItemThreshold: 'Berapa hari sebelum tenggat pengingat mulai dikirim.',
+      notificationAdminItemRuleId: 'Rule administratif yang menentukan group dan jadwal pengiriman.',
+      notificationTemplateName: 'Nama identifikasi template pada konfigurasi notifikasi.',
+      notificationTemplateChannel: 'Channel yang menggunakan template ini.',
+      notificationTemplateSubject: 'Subject email atau judul pesan notifikasi.',
+      notificationTemplateBody: 'Isi pesan. Gunakan placeholder yang didukung aplikasi.',
+      notificationGroupName: 'Nama group yang akan digunakan kembali pada satu atau beberapa notification rule.',
+      notificationGroupProjectId: 'Project ID untuk membatasi group pada proyek tertentu. Kosongkan untuk group umum.',
+      notificationGroupRoles: 'Role penerima yang terkait dengan group, dipisahkan dengan koma.',
+      notificationEmailTo: 'Penerima utama email. Pisahkan beberapa alamat dengan koma, titik koma, atau baris baru.',
+      notificationEmailCc: 'Penerima salinan email yang terlihat oleh penerima lain.',
+      notificationEmailBcc: 'Penerima salinan tersembunyi. Alamat tidak terlihat oleh penerima lain.',
+      notificationWhatsAppNumbers: 'Nomor WhatsApp penerima. Nomor akan dinormalisasi ke format internasional.',
+      notificationRuleProjectId: 'Project yang memicu rule. Kosongkan untuk rule administratif tanpa proyek.',
+      notificationRuleGroupId: 'Group ID tujuan notifikasi. Gunakan ID dari daftar Recipient Group.',
+      notificationRuleEvent: 'Peristiwa yang memicu notifikasi.',
+      notificationRuleFrequency: 'Pola waktu pengiriman: event, harian, mingguan, atau hari custom.',
+      notificationRuleTime: 'Jam lokal ketika scheduler memproses rule terjadwal.',
+      notificationRuleTemplateId: 'Template custom yang digunakan saat pesan dibuat.',
+      notificationRuleDays: 'Hari pengiriman: 1 = Senin sampai 7 = Minggu.',
+      notificationRuleDedupe: 'Jeda minimum dalam menit sebelum event dan penerima yang sama boleh menerima notifikasi lagi.'
+    };
+    Object.keys(tips).forEach(function(id) {
+      const field = document.getElementById(id);
+      const label = field && field.closest('.form-group') && field.closest('.form-group').querySelector('label');
+      if (label && !label.querySelector('.field-tooltip')) {
+        label.insertAdjacentHTML('beforeend', ' <span class="field-tooltip" tabindex="0" data-tooltip="' + tips[id] + '">?</span>');
+      }
+      if (field) field.setAttribute('title', tips[id]);
+    });
+  }
+
+  function setupAdministrativeItemFields(card) {
+    const title = card.querySelector('.card-title');
+    const desc = card.querySelector('.card-desc');
+    if (title) title.textContent = '🗂️ Pengingat Administrasi';
+    if (desc) desc.textContent = 'Catat kewajiban administrasi yang tidak terkait langsung dengan proyek, lalu kirim pengingat berdasarkan tenggat.';
+    const fields = [
+      ['notificationAdminItemTitle', 'Judul Administrasi', 'Nama singkat kewajiban atau aktivitas administrasi.'],
+      ['notificationAdminItemDescription', 'Deskripsi dan Tindakan', 'Jelaskan detail, dokumen, atau tindakan yang harus dilakukan.'],
+      ['notificationAdminItemCategory', 'Kategori', 'Contoh: COMPLIANCE, PAYMENT, DOCUMENT, atau GENERAL.'],
+      ['notificationAdminItemOwner', 'PIC / Owner', 'Orang yang bertanggung jawab menindaklanjuti item ini.'],
+      ['notificationAdminItemStatus', 'Status', 'COMPLETED atau CANCELLED akan menghentikan pengingat.'],
+      ['notificationAdminItemDueDate', 'Tanggal Tenggat', 'Tanggal batas waktu penyelesaian administrasi.'],
+      ['notificationAdminItemThreshold', 'Pengingat H-', 'Jumlah hari sebelum tenggat ketika pengingat mulai dikirim.'],
+      ['notificationAdminItemRuleId', 'Rule ID Administratif', 'Rule yang menentukan group, channel, template, dan jadwal pengiriman.']
+    ];
+    fields.forEach(function(item) {
+      const field = document.getElementById(item[0]);
+      if (!field || field.dataset.helpReady) return;
+      const group = field.closest('.form-group') || field.parentElement;
+      if (!group) return;
+      const label = document.createElement('label');
+      label.className = 'form-label settings-form-label';
+      label.setAttribute('for', item[0]);
+      label.innerHTML = item[1] + ' <span class="field-tooltip" tabindex="0" data-tooltip="' + item[2] + '">?</span>';
+      group.insertBefore(label, field);
+      field.setAttribute('title', item[2]);
+      field.dataset.helpReady = 'true';
+    });
+  }
+
+  function setupNotificationFrequencyFields() {
+    const frequency = document.getElementById('notificationRuleFrequency');
+    const time = document.getElementById('notificationRuleTime');
+    const days = document.getElementById('notificationRuleDays');
+    if (!frequency || !time || !days) return;
+    const timeGroup = time.closest('.form-group');
+    const daysGroup = days.closest('.form-group');
+    if (!timeGroup || !daysGroup) return;
+    const help = document.createElement('small');
+    help.className = 'field-help frequency-help';
+    frequency.closest('.form-group').appendChild(help);
+    const update = function() {
+      const value = frequency.value;
+      const isEvent = value === 'EVENT';
+      timeGroup.hidden = isEvent;
+      daysGroup.hidden = isEvent;
+      days.required = value === 'WEEKLY' || value === 'CUSTOM';
+      if (value === 'DAILY') {
+        days.placeholder = 'Opsional: 1,2,3,4,5';
+        help.textContent = 'Pengiriman berjalan setiap hari pada jam yang dipilih.';
+      } else if (value === 'WEEKLY') {
+        days.placeholder = 'Wajib: 1,2,3,4,5';
+        help.textContent = 'Pilih hari dalam format 1–7, dengan 1 = Senin.';
+      } else if (value === 'CUSTOM') {
+        days.placeholder = 'Wajib, contoh: 2,4,6';
+        help.textContent = 'Gunakan hari tertentu dan jam pengiriman yang ditentukan.';
+      } else {
+        help.textContent = 'Notifikasi dikirim berdasarkan event; jadwal hari dan jam tidak digunakan.';
+      }
+    };
+    frequency.addEventListener('change', update);
+    update();
+  }
+
+  function setupScheduleActionButtons() {
+    const card = document.getElementById('recipientRuleCard');
+    if (!card) return;
+    const ruleForm = Array.from(card.querySelectorAll('form')).find(function(form) { return typeof form.getAttribute('onsubmit') === 'string' && form.getAttribute('onsubmit').indexOf('saveNotificationRule') >= 0; });
+    const saveButton = ruleForm && ruleForm.querySelector('button[type="submit"]');
+    const schedulerButton = card.querySelector('button[onclick*="installNotificationScheduler"]');
+    let actionRow = card.querySelector('.settings-actions-row');
+    if (!actionRow) {
+      actionRow = document.createElement('div');
+      actionRow.className = 'settings-actions-row';
+      const ruleForm = saveButton && saveButton.closest('form');
+      const schedulerWrapper = schedulerButton && schedulerButton.parentElement;
+      if (ruleForm && schedulerWrapper) {
+        ruleForm.parentNode.insertBefore(actionRow, schedulerWrapper);
+        actionRow.appendChild(ruleForm.querySelector('.settings-action-toolbar') || saveButton);
+        actionRow.appendChild(schedulerWrapper);
+      }
+    }
+    if (saveButton) {
+      saveButton.classList.add('settings-action-primary', 'action-tooltip');
+      saveButton.textContent = 'Simpan Notification Rule';
+      saveButton.setAttribute('data-tooltip', 'Menyimpan event, penerima, frekuensi, waktu, template, dan deduplikasi rule ini.');
+      saveButton.setAttribute('title', 'Simpan Notification Rule');
+      const saveToolbar = document.createElement('div');
+      saveToolbar.className = 'settings-action-toolbar';
+      if (saveButton.parentNode) saveButton.parentNode.insertBefore(saveToolbar, saveButton);
+      saveToolbar.appendChild(saveButton);
+    }
+    if (schedulerButton) {
+      schedulerButton.classList.add('settings-action-secondary', 'action-tooltip');
+      schedulerButton.textContent = 'Aktifkan Scheduler';
+      schedulerButton.setAttribute('data-tooltip', 'Memasang scheduler Apps Script yang menjalankan sweep notifikasi dan retry otomatis setiap jam.');
+      schedulerButton.setAttribute('title', 'Aktifkan Scheduler notifikasi setiap jam');
+      const wrapper = schedulerButton.parentElement;
+      if (wrapper) wrapper.classList.add('settings-action-toolbar');
+    }
+  }
 
   // ==========================================
   // 1. SESSION & AUTHENTICATION
   // ==========================================
 
-  const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
+  const IDLE_TIMEOUT_MINUTES = 60; // default 1 jam; tidak disimpan di sheet
+  const MIN_IDLE_TIMEOUT_MINUTES = 5;
+  const MAX_IDLE_TIMEOUT_MINUTES = 480;
+  const EFFECTIVE_IDLE_TIMEOUT_MINUTES = Math.min(MAX_IDLE_TIMEOUT_MINUTES, Math.max(MIN_IDLE_TIMEOUT_MINUTES, IDLE_TIMEOUT_MINUTES));
+  const IDLE_TIMEOUT_MS = EFFECTIVE_IDLE_TIMEOUT_MINUTES * 60 * 1000;
   let idleTimer = null;
+
+  function saveLocalSession(user, loginAt, sessionToken) {
+    const now = Date.now();
+    localStorage.setItem('sysrem_session', JSON.stringify({
+      user: user,
+      sessionToken: sessionToken || '',
+      loginAt: loginAt || now,
+      lastActivityAt: now,
+      expiresAt: now + IDLE_TIMEOUT_MS
+    }));
+  }
+
+  function clearLocalSession() {
+    localStorage.removeItem('sysrem_session');
+  }
 
   function resetIdleTimer() {
     if (idleTimer) clearTimeout(idleTimer);
     if (AppState.isAuthenticated) {
+      const raw = localStorage.getItem('sysrem_session');
+      if (raw) {
+        try {
+          const session = JSON.parse(raw);
+          const now = Date.now();
+          session.lastActivityAt = now;
+          session.expiresAt = now + IDLE_TIMEOUT_MS;
+          localStorage.setItem('sysrem_session', JSON.stringify(session));
+        } catch (e) {
+          clearLocalSession();
+        }
+      }
       idleTimer = setTimeout(() => {
         showToast("Sesi berakhir otomatis karena tidak ada aktivitas.", "warning");
         logoutUser();
@@ -48,17 +314,25 @@
   });
 
   function checkActiveSession() {
-    const savedSession = sessionStorage.getItem('sysrem_session');
+    const savedSession = localStorage.getItem('sysrem_session');
     if (savedSession) {
       try {
-        const userData = JSON.parse(savedSession);
+        const stored = JSON.parse(savedSession);
+        const now = Date.now();
+        const session = stored.user ? stored : { user: stored, loginAt: now, lastActivityAt: now, expiresAt: now + IDLE_TIMEOUT_MS };
+        if (!session.expiresAt || now >= Number(session.expiresAt)) {
+          clearLocalSession();
+          renderAuthScreen();
+          return;
+        }
+        const userData = session.user;
         AppState.isAuthenticated = true;
         AppState.currentUser = userData;
         renderAuthenticatedApp();
         resetIdleTimer();
         return;
       } catch (e) {
-        sessionStorage.removeItem('sysrem_session');
+        clearLocalSession();
       }
     }
 
@@ -78,7 +352,7 @@
         if (response && response.success && response.data && response.data.isAuthenticated) {
           AppState.isAuthenticated = true;
           AppState.currentUser = response.data.user;
-          sessionStorage.setItem('sysrem_session', JSON.stringify(response.data.user));
+          saveLocalSession(response.data.user);
           renderAuthenticatedApp();
           resetIdleTimer();
         } else {
@@ -123,10 +397,39 @@
 
     loadDashboardSummary();
     loadProjects();
-    
-    if (AppState.currentUser && AppState.currentUser.role === "ADMINISTRATOR") {
-      loadUsers();
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      loadLocalDummyNotificationData();
+      return;
     }
+    
+    if (AppState.currentUser && AppState.currentUser.role === "ADMINISTRATOR" && typeof google !== 'undefined' && google.script && google.script.run) {
+      loadUsers();
+      loadNotificationGroups();
+      loadNotificationAdminItems();
+      loadNotificationRules();
+      loadNotificationTemplates();
+    }
+  }
+
+  function loadLocalDummyNotificationData() {
+    const data = getLocalDummyNotificationData();
+    renderNotificationGroups(data.groups);
+    renderNotificationRules(data.rules);
+    renderNotificationTemplates(data.templates);
+    const adminList = document.getElementById('notificationAdminItemsList');
+    if (adminList) adminList.innerHTML = data.adminItems.map(function(i) { return '<div class="card settings-list-item"><strong>🗂️ ' + escapeHtml(i.title) + '</strong><br><small>' + escapeHtml(i.category) + ' · ' + escapeHtml(i.status) + ' · deadline ' + escapeHtml(i.due_date) + '</small></div>'; }).join('');
+    const deliveryList = document.getElementById('notificationDeliveriesList');
+    if (deliveryList) deliveryList.innerHTML = '<div class="settings-help-banner">📦 Preview lokal: delivery audit dummy tersedia setelah backend GAS terhubung.</div>';
+  }
+
+  function getLocalDummyNotificationData() {
+    return {
+      groups: [{ group_id: 'grp_demo_management', group_name: 'Manajemen Proyek', project_id: 'PRJ-DEMO-001', recipient_roles: 'PIC,MANAGER', email_to: 'manager@example.com', email_cc: 'auditor@example.com', whatsapp_numbers: '6281234567890' }, { group_id: 'grp_demo_admin', group_name: 'Administrasi & Compliance', project_id: '', recipient_roles: 'ADMINISTRATOR,AUDITOR', email_to: 'admin@example.com', email_cc: '', whatsapp_numbers: '6289876543210' }],
+      rules: [{ rule_id: 'rule_demo_delayed', project_id: 'PRJ-DEMO-001', event_type: 'DELAYED', frequency: 'DAILY', send_time: '08:00', days_of_week: '1,2,3,4,5', timezone: 'Asia/Jakarta' }, { rule_id: 'rule_demo_admin', project_id: '', event_type: 'ADMINISTRATIVE_REMINDER', frequency: 'WEEKLY', send_time: '09:00', days_of_week: '1', timezone: 'Asia/Jakarta' }],
+      templates: [{ template_id: 'tpl_demo_email', template_name: 'Peringatan Administrasi', channel: 'EMAIL', template_version: 1, subject: '[Demo] Pengingat administrasi' }, { template_id: 'tpl_demo_wa', template_name: 'Status Proyek WhatsApp', channel: 'WHATSAPP', template_version: 1, subject: '' }],
+      adminItems: [{ item_id: 'adm_demo_001', title: 'Perpanjangan izin operasional', category: 'COMPLIANCE', status: 'OPEN', due_date: '2026-12-15' }, { item_id: 'adm_demo_002', title: 'Review dokumen kontrak', category: 'DOCUMENT', status: 'IN_PROGRESS', due_date: '2026-11-25' }]
+    };
   }
 
   // Handle Login Form Submit
@@ -165,7 +468,7 @@
               showToast("Wajib mengganti password default Anda.", "info");
             } else {
               AppState.currentUser = response.data.user;
-              sessionStorage.setItem('sysrem_session', JSON.stringify(response.data.user));
+              saveLocalSession(response.data.user, Date.now(), response.data.sessionToken);
               showToast("Login berhasil! Selamat datang.", "success");
               renderAuthenticatedApp();
               resetIdleTimer();
@@ -226,7 +529,7 @@
 
   function logoutUser() {
     showLoading("Mengakhiri sesi aman...");
-    sessionStorage.removeItem('sysrem_session');
+    clearLocalSession();
     if (idleTimer) clearTimeout(idleTimer);
     
     if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -466,7 +769,8 @@
             <td><small>${startLocal} s.d. ${endLocal}</small></td>
             <td><small>${emailIcon} | ${waIcon}</small></td>
             <td>${statusBadge}</td>
-            <td style="text-align: right;">
+             <td style="text-align: right;">
+               <button type="button" class="btn btn-sm btn-outline" onclick="editProject('${p.project_id}')">Edit</button>
               <button type="button" class="btn btn-sm btn-outline" onclick="viewProjectCurve('${p.project_id}')">📈 S-Curve</button>
               <button type="button" class="btn btn-sm btn-outline" style="color: var(--accent-red); border-color: rgba(244,63,94,0.3);" onclick="confirmDeleteProject('${p.project_id}', '${p.project_name}')">🗑️</button>
             </td>
@@ -568,6 +872,7 @@
         logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
+          AppState.progressLogs = response.data || [];
           renderProgressLogsTable(response.data || []);
         }
       })
@@ -593,7 +898,8 @@
           <td>${l.notes || '-'}</td>
           <td><small style="color: var(--text-muted);">${l.recorded_by}</small></td>
           <td>
-            <button type="button" class="btn btn-sm btn-outline" style="color: var(--accent-red);" onclick="deleteProgressLog('${l.progress_id}')">Hapus</button>
+             <button type="button" class="btn btn-sm btn-outline" onclick="editProgressLog('${l.progress_id}')">Edit</button>
+             <button type="button" class="btn btn-sm btn-outline" style="color: var(--accent-red);" onclick="deleteProgressLog('${l.progress_id}')">Hapus</button>
           </td>
         </tr>
       `;
@@ -792,6 +1098,9 @@
 
   function openCreateProjectModal() {
     document.getElementById('createProjectForm').reset();
+    document.getElementById('projectEditId').value = '';
+    document.getElementById('projectModalTitle').textContent = 'Registrasi Proyek Baru';
+    document.getElementById('projectSubmitLabel').textContent = 'Simpan Proyek';
     openModal('createProjectModal');
   }
 
@@ -804,6 +1113,7 @@
     }
     
     document.getElementById('recordProgressForm').reset();
+    document.getElementById('progressEditId').value = '';
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('progModalDate').value = today;
     openModal('recordProgressModal');
@@ -823,6 +1133,8 @@
       isWaActive: true
     };
 
+    const projectId = document.getElementById('projectEditId').value;
+
     showLoading("Mendaftarkan proyek baru...");
     logDebug("⏳", "Memanggil apiRegisterProject...");
     google.script.run
@@ -830,7 +1142,7 @@
         logDebug("✅", "GAS Response OK:", response);
         hideLoading();
         if (response && response.success) {
-          showToast("Proyek berhasil didaftarkan!", "success");
+          showToast(projectId ? "Proyek berhasil diperbarui!" : "Proyek berhasil didaftarkan!", "success");
           closeModal('createProjectModal');
           loadProjects();
         } else {
@@ -842,7 +1154,24 @@
         hideLoading();
         showToast(err.message || "Error saat pendaftaran proyek.", "error");
       })
-      .apiRegisterProject(payload);
+      [projectId ? 'apiUpdateProject' : 'apiRegisterProject'](...(projectId ? [projectId, payload] : [payload]));
+  }
+
+  function editProject(projectId) {
+    const item = AppState.projects.find((entry) => (entry.project || entry).project_id === projectId);
+    const p = item && (item.project || item);
+    if (!p) return showToast("Data proyek tidak ditemukan.", "error");
+    document.getElementById('projectEditId').value = p.project_id;
+    document.getElementById('pName').value = p.project_name || '';
+    document.getElementById('pStartDate').value = p.start_date || '';
+    document.getElementById('pEndDate').value = p.end_date || '';
+    document.getElementById('pPicName').value = p.pic_name || '';
+    document.getElementById('pPicEmail').value = p.pic_email || '';
+    document.getElementById('pPicPhone').value = p.pic_phone || '';
+    document.getElementById('pDesc').value = p.description || '';
+    document.getElementById('projectModalTitle').textContent = 'Edit Proyek';
+    document.getElementById('projectSubmitLabel').textContent = 'Simpan Perubahan';
+    openModal('createProjectModal');
   }
 
   function handleRecordProgress(event) {
@@ -855,6 +1184,28 @@
       notes: document.getElementById('progModalNotes').value.trim(),
       allowOverwrite: true
     };
+
+    const editLogId = document.getElementById('progressEditId').value;
+    if (editLogId) {
+      showLoading("Memperbarui progres harian...");
+      google.script.run.withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Progres berhasil diperbarui.", "success");
+          closeModal('recordProgressModal');
+          loadProjects();
+          loadProjectProgressLogs(payload.projectId);
+        } else showToast(response && response.error ? response.error.message : "Gagal memperbarui progres.", "error");
+      }).withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Gagal memperbarui progres.", "error");
+      }).apiUpdateDailyProgress(editLogId, {
+        actualProgress: payload.actualProgress,
+        date: payload.date,
+        notes: payload.notes
+      });
+      return;
+    }
 
     showLoading("Mencatat progres harian...");
     logDebug("⏳", "Memanggil apiRecordDailyProgress...");
@@ -877,6 +1228,20 @@
         showToast(err.message || "Error saat mencatat progres.", "error");
       })
       .apiRecordDailyProgress(payload);
+  }
+
+  function editProgressLog(logId) {
+    const log = AppState.progressLogs.find((entry) => (entry.progress_id || entry.log_id) === logId);
+    if (!log) return showToast('Catatan progres tidak ditemukan.', 'error');
+    const projectId = document.getElementById('progressProjectSelect').value;
+    document.getElementById('progressEditId').value = logId;
+    document.getElementById('progModalProject').value = projectId;
+    document.getElementById('progModalDate').value = log.date || log.report_date || '';
+    document.getElementById('progModalActual').value = log.actual_progress || 0;
+    document.getElementById('progModalNotes').value = log.notes || '';
+    populateProgressWbsDropdown(projectId);
+    setTimeout(() => { document.getElementById('progModalWbs').value = log.wbs_id || ''; }, 250);
+    openModal('recordProgressModal');
   }
 
   function confirmDeleteProject(projectId, projectName) {
@@ -934,6 +1299,180 @@
         showToast("Error pengiriman WA: " + err.message, "error");
       })
       .apiSendTestWhatsApp(phone);
+  }
+
+  function saveNotificationToken(event) {
+    event.preventDefault();
+    const token = document.getElementById('fonnteTokenInput').value.trim();
+    if (!token) return showToast('Token wajib diisi.', 'error');
+    showLoading('Menyimpan token Fonnte...');
+    google.script.run.withSuccessHandler((response) => {
+      hideLoading();
+      showToast(response && response.success ? 'Token Fonnte tersimpan.' : 'Gagal menyimpan token.', response && response.success ? 'success' : 'error');
+      if (response && response.success) document.getElementById('fonnteTokenInput').value = '';
+    }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal menyimpan token.', 'error'); }).apiSetFonnteToken(token);
+  }
+
+  function handleSendTestEmail(event) {
+    event.preventDefault();
+    const email = document.getElementById('emailTestRecipient').value.trim();
+    showLoading('Mengirim test email...');
+    google.script.run.withSuccessHandler((response) => {
+      hideLoading();
+      const ok = response && response.success && response.data && response.data.sent;
+      showToast(ok ? 'Test email berhasil dikirim.' : 'Test email gagal dikirim.', ok ? 'success' : 'error');
+    }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal mengirim email.', 'error'); }).apiSendTestEmail(email);
+  }
+
+  function saveRecipientGroup(event) {
+    event.preventDefault();
+    const payload = { group_id: document.getElementById('notificationGroupId').value, project_id: document.getElementById('notificationGroupProjectId').value, group_name: document.getElementById('notificationGroupName').value, recipient_roles: document.getElementById('notificationGroupRoles').value, email_to: document.getElementById('notificationEmailTo').value, email_cc: document.getElementById('notificationEmailCc').value, email_bcc: document.getElementById('notificationEmailBcc').value, whatsapp_numbers: document.getElementById('notificationWhatsAppNumbers').value };
+    submitNotificationConfig('apiSaveNotificationGroup', payload, 'Group penerima berhasil disimpan.', loadNotificationGroups);
+  }
+
+  function loadNotificationGroups() {
+    if (!AppState.currentUser || AppState.currentUser.role !== 'ADMINISTRATOR') return;
+    google.script.run.withSuccessHandler((response) => {
+      if (response && response.success) renderNotificationGroups(response.data.groups || []);
+    }).apiGetNotificationConfig();
+  }
+
+  function saveNotificationAdminItem(event) { event.preventDefault(); const payload = { item_id: document.getElementById('notificationAdminItemId').value, title: document.getElementById('notificationAdminItemTitle').value, description: document.getElementById('notificationAdminItemDescription').value, category: document.getElementById('notificationAdminItemCategory').value, owner: document.getElementById('notificationAdminItemOwner').value, status: document.getElementById('notificationAdminItemStatus').value, due_date: document.getElementById('notificationAdminItemDueDate').value, threshold_days: Number(document.getElementById('notificationAdminItemThreshold').value || 0), rule_id: document.getElementById('notificationAdminItemRuleId').value }; submitNotificationConfig('apiSaveNotificationAdminItem', payload, 'Pengingat administrasi tersimpan.', loadNotificationAdminItems); }
+  function loadNotificationAdminItems() { google.script.run.withSuccessHandler(function(r) { if (r && r.success) { const el = document.getElementById('notificationAdminItemsList'); el.innerHTML = (r.data.items || []).map(function(i) { return '<div class="card"><strong>' + i.title + '</strong><br><small>' + (i.category || 'GENERAL') + ' | ' + (i.due_date || '-') + ' | ' + (i.status || 'OPEN') + '</small> <button type="button" class="btn btn-sm btn-outline" onclick=\'editNotificationAdminItem(' + JSON.stringify(i) + ')\'>Edit</button> <button type="button" class="btn btn-sm btn-outline" onclick="deleteNotificationAdminItem(\'' + i.item_id + '\')">Hapus</button></div>'; }).join(''); } }).apiGetNotificationAdminItems(); }
+  function deleteNotificationAdminItem(id) { if (!confirm('Hapus pengingat administrasi ini?')) return; google.script.run.withSuccessHandler(loadNotificationAdminItems).apiDeleteNotificationAdminItem(id); }
+  function editNotificationAdminItem(item) { document.getElementById('notificationAdminItemId').value=item.item_id||''; document.getElementById('notificationAdminItemTitle').value=item.title||''; document.getElementById('notificationAdminItemDescription').value=item.description||''; document.getElementById('notificationAdminItemCategory').value=item.category||''; document.getElementById('notificationAdminItemOwner').value=item.owner||''; document.getElementById('notificationAdminItemStatus').value=item.status||'OPEN'; document.getElementById('notificationAdminItemDueDate').value=item.due_date||''; document.getElementById('notificationAdminItemThreshold').value=item.threshold_days||0; document.getElementById('notificationAdminItemRuleId').value=item.rule_id||''; }
+
+  function renderNotificationGroups(groups) {
+    const el = document.getElementById('notificationGroupsList');
+    if (!el) return;
+    if (!groups.length) { el.innerHTML = '<small class="text-muted">Belum ada group penerima.</small>'; return; }
+    el.innerHTML = '<h4 style="margin-bottom:8px;">Group Tersimpan</h4>' + groups.map((g) => `<div class="card settings-list-item" style="padding:10px;margin-bottom:8px;"><strong>${escapeHtml(g.group_name)}</strong><br><small>ID: <code>${escapeHtml(g.group_id)}</code> | Project: ${escapeHtml(g.project_id || '-')} | Role: ${escapeHtml(g.recipient_roles || '-')}<br>To: ${escapeHtml(g.email_to || '-')} | WA: ${escapeHtml(g.whatsapp_numbers || '-')}</small><br><button type="button" class="btn btn-sm btn-outline" onclick="editNotificationGroup('${escapeHtml(g.group_id)}')">Edit</button> <button type="button" class="btn btn-sm btn-outline" onclick="deleteNotificationGroup('${escapeHtml(g.group_id)}')">Hapus</button></div>`).join('');
+  }
+
+  function editNotificationGroup(groupId) {
+    google.script.run.withSuccessHandler((response) => {
+      const group = response && response.success && response.data.groups.find((g) => g.group_id === groupId);
+      if (!group) return showToast('Group tidak ditemukan.', 'error');
+      document.getElementById('notificationGroupId').value = group.group_id;
+      document.getElementById('notificationGroupProjectId').value = group.project_id || '';
+      document.getElementById('notificationGroupName').value = group.group_name || '';
+      document.getElementById('notificationGroupRoles').value = group.recipient_roles || '';
+      document.getElementById('notificationEmailTo').value = group.email_to || '';
+      document.getElementById('notificationEmailCc').value = group.email_cc || '';
+      document.getElementById('notificationEmailBcc').value = group.email_bcc || '';
+      document.getElementById('notificationWhatsAppNumbers').value = group.whatsapp_numbers || '';
+      document.getElementById('notificationGroupName').focus();
+    }).apiGetNotificationConfig();
+  }
+
+  function deleteNotificationGroup(groupId) {
+    if (!confirm('Hapus group penerima ini? Rule yang menggunakannya perlu diperiksa kembali.')) return;
+    showLoading('Menghapus group penerima...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? 'Group berhasil dihapus.' : 'Gagal menghapus group.', response && response.success ? 'success' : 'error'); if (response && response.success) loadNotificationGroups(); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal menghapus group.', 'error'); }).apiDeleteNotificationGroup(groupId);
+  }
+
+  function saveNotificationRule(event) {
+    event.preventDefault();
+    const payload = { project_id: document.getElementById('notificationRuleProjectId').value, group_id: document.getElementById('notificationRuleGroupId').value, template_id: document.getElementById('notificationRuleTemplateId').value, event_type: document.getElementById('notificationRuleEvent').value, frequency: document.getElementById('notificationRuleFrequency').value, days_of_week: document.getElementById('notificationRuleDays').value, send_time: document.getElementById('notificationRuleTime').value, dedupe_minutes: Number(document.getElementById('notificationRuleDedupe').value || 1440) };
+    submitNotificationConfig('apiSaveNotificationRule', payload, 'Aturan notifikasi berhasil disimpan.', loadNotificationRules);
+  }
+
+  function loadNotificationRules() {
+    if (!AppState.currentUser || AppState.currentUser.role !== 'ADMINISTRATOR') return;
+    google.script.run.withSuccessHandler((response) => {
+      if (response && response.success) renderNotificationRules(response.data.rules || []);
+    }).apiGetNotificationConfig();
+  }
+
+  function renderNotificationRules(rules) {
+    const el = document.getElementById('notificationRulesList');
+    if (!el) return;
+    if (!rules.length) { el.innerHTML = '<small class="text-muted">Belum ada rule notifikasi.</small>'; return; }
+    el.innerHTML = '<h4 style="margin-bottom:8px;">Rule Tersimpan</h4>' + rules.map((r) => `<div class="card" style="padding:10px;margin-bottom:8px;"><strong>${escapeHtml(r.event_type)}</strong> — ${escapeHtml(r.frequency)} ${escapeHtml(r.send_time || '')}<br><small>Project: ${escapeHtml(r.project_id)} | Hari: ${escapeHtml(r.days_of_week || 'setiap hari')} | Timezone: ${escapeHtml(r.timezone || '-')}</small><br><button type="button" class="btn btn-sm btn-outline" onclick="deleteNotificationRule('${escapeHtml(r.rule_id)}')">Hapus</button></div>`).join('');
+  }
+
+  function deleteNotificationRule(ruleId) {
+    if (!confirm('Hapus rule notifikasi ini?')) return;
+    showLoading('Menghapus rule...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? 'Rule berhasil dihapus.' : 'Gagal menghapus rule.', response && response.success ? 'success' : 'error'); if (response && response.success) loadNotificationRules(); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal menghapus rule.', 'error'); }).apiDeleteNotificationRule(ruleId);
+  }
+
+  function installNotificationScheduler() {
+    if (!confirm('Pasang satu scheduler notifikasi yang berjalan setiap jam?')) return;
+    showLoading('Memasang scheduler...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? response.data.message || 'Scheduler berhasil dipasang.' : 'Scheduler gagal dipasang.', response && response.success ? 'success' : 'error'); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal memasang scheduler.', 'error'); }).apiInstallNotificationScheduler();
+  }
+
+  function saveNotificationTemplate(event) {
+    event.preventDefault();
+    const payload = { template_id: document.getElementById('notificationTemplateId').value, template_name: document.getElementById('notificationTemplateName').value, channel: document.getElementById('notificationTemplateChannel').value, subject: document.getElementById('notificationTemplateSubject').value, body: document.getElementById('notificationTemplateBody').value };
+    submitNotificationConfig('apiSaveNotificationTemplate', payload, 'Template notifikasi berhasil disimpan.', loadNotificationTemplates);
+  }
+
+  function loadNotificationTemplates() {
+    if (!AppState.currentUser || AppState.currentUser.role !== 'ADMINISTRATOR') return;
+    google.script.run.withSuccessHandler((response) => { if (response && response.success) renderNotificationTemplates(response.data.templates || []); }).apiGetNotificationConfig();
+  }
+
+  function renderNotificationTemplates(templates) {
+    const el = document.getElementById('notificationTemplatesList');
+    if (!el) return;
+    if (!templates.length) { el.innerHTML = '<small class="text-muted">Belum ada template.</small>'; return; }
+    el.innerHTML = '<h4 style="margin-bottom:8px;">Template Tersimpan</h4>' + templates.map((t) => `<div class="card" style="padding:10px;margin-bottom:8px;"><strong>${escapeHtml(t.template_name)}</strong> — ${escapeHtml(t.channel)}<br><small>ID: ${escapeHtml(t.template_id)} | Versi: ${escapeHtml(t.template_version || 1)} | Subject: ${escapeHtml(t.subject)}</small><br><button type="button" class="btn btn-sm btn-outline" onclick="editNotificationTemplate('${escapeHtml(t.template_id)}')">Edit</button> <button type="button" class="btn btn-sm btn-outline" onclick="previewNotificationTemplate('${escapeHtml(t.template_id)}')">Preview</button> <button type="button" class="btn btn-sm btn-outline" onclick="deleteNotificationTemplate('${escapeHtml(t.template_id)}')">Hapus</button></div>`).join('');
+  }
+
+  function rollbackNotificationTemplate(templateId, historyJson) {
+    let history = []; try { history = JSON.parse(historyJson || '[]'); } catch (e) {}
+    if (!history.length) { showToast('Belum ada versi lama untuk di-rollback.', 'error'); return; }
+    const version = prompt('Masukkan nomor versi tujuan: ' + history.map(v => v.version).join(', '));
+    if (!version) return;
+    submitNotificationConfig('apiRollbackNotificationTemplate', [templateId, Number(version)], 'Template berhasil di-rollback.', loadNotificationTemplates);
+  }
+
+  function editNotificationTemplate(templateId) {
+    google.script.run.withSuccessHandler((response) => {
+      const t = response && response.success && response.data.templates.find((item) => item.template_id === templateId);
+      if (!t) return showToast('Template tidak ditemukan.', 'error');
+      document.getElementById('notificationTemplateId').value = t.template_id;
+      document.getElementById('notificationTemplateName').value = t.template_name || '';
+      document.getElementById('notificationTemplateChannel').value = t.channel || 'EMAIL';
+      document.getElementById('notificationTemplateSubject').value = t.subject || '';
+      document.getElementById('notificationTemplateBody').value = t.body || '';
+      document.getElementById('notificationTemplateName').focus();
+    }).apiGetNotificationConfig();
+  }
+
+  function previewNotificationTemplate(templateId) {
+    google.script.run.withSuccessHandler((response) => { if (response && response.success) alert('Subject: ' + response.data.subject + '\n\n' + response.data.body); else showToast('Preview gagal.', 'error'); }).withFailureHandler((err) => showToast(err.message || 'Preview gagal.', 'error')).apiPreviewNotificationTemplate({ template_id: templateId });
+  }
+
+  function deleteNotificationTemplate(templateId) {
+    if (!confirm('Hapus template ini? Rule yang menggunakannya perlu diperiksa kembali.')) return;
+    showLoading('Menghapus template...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? 'Template berhasil dihapus.' : 'Gagal menghapus template.', response && response.success ? 'success' : 'error'); if (response && response.success) loadNotificationTemplates(); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal menghapus template.', 'error'); }).apiDeleteNotificationTemplate(templateId);
+  }
+
+  function loadNotificationDeliveries() {
+    showLoading('Memuat delivery audit...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); if (response && response.success) renderNotificationDeliveries(response.data.deliveries || []); else showToast('Delivery audit gagal dimuat.', 'error'); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Delivery audit gagal dimuat.', 'error'); }).apiGetNotificationDeliveries({ limit: 50 });
+  }
+
+  function renderNotificationDeliveries(deliveries) {
+    const el = document.getElementById('notificationDeliveriesList');
+    if (!el) return;
+    if (!deliveries.length) { el.innerHTML = '<small class="text-muted">Belum ada delivery.</small>'; return; }
+    el.innerHTML = '<div class="table-responsive"><table class="data-table"><thead><tr><th>Waktu</th><th>Channel</th><th>Penerima</th><th>Status</th><th>Attempts</th><th>Alasan</th><th>Aksi</th></tr></thead><tbody>' + deliveries.map((d) => `<tr><td>${d.created_at || '-'}</td><td>${d.channel || '-'}</td><td>${d.recipient || '-'}</td><td>${d.status || '-'}</td><td>${d.attempts || 0}</td><td>${d.last_error || '-'}</td><td>${d.status === 'FAILED' ? `<button class="btn btn-sm btn-warning" onclick="retryNotificationDelivery('${d.delivery_id}')">Retry</button>` : '-'}</td></tr>`).join('') + '</tbody></table></div>';
+  }
+
+  function retryNotificationDelivery(deliveryId) {
+    if (!confirm('Retry delivery ini sekarang?')) return;
+    showLoading('Menjalankan retry delivery...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? 'Retry selesai.' : 'Retry gagal.', response && response.success ? 'success' : 'error'); loadNotificationDeliveries(); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Retry gagal.', 'error'); }).apiRetryNotificationDelivery(deliveryId);
+  }
+
+  function submitNotificationConfig(method, payload, successMessage, afterSuccess) {
+    showLoading('Menyimpan konfigurasi notifikasi...');
+    google.script.run.withSuccessHandler((response) => { hideLoading(); showToast(response && response.success ? successMessage : 'Konfigurasi gagal disimpan.', response && response.success ? 'success' : 'error'); if (response && response.success && afterSuccess) afterSuccess(); }).withFailureHandler((err) => { hideLoading(); showToast(err.message || 'Gagal menyimpan konfigurasi.', 'error'); })[method](payload);
   }
 
   function triggerManualSweep() {
@@ -1016,7 +1555,7 @@
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const iconMap = { success: '✅', error: '❌', info: 'ℹ️' };
-    toast.innerHTML = `<span>${iconMap[type] || 'ℹ️'}</span><span>${message}</span>`;
+    toast.innerHTML = `<span>${escapeHtml(iconMap[type] || 'ℹ️')}</span><span>${escapeHtml(message)}</span>`;
     container.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = '0';
@@ -1132,6 +1671,7 @@
     google.script.run
       .withSuccessHandler((response) => {
         if (response && response.success) {
+          AppState.users = response.data || [];
           renderUsersTable(response.data);
         }
       })
@@ -1158,7 +1698,7 @@
           <td>${activeBadge}</td>
           <td><small class="text-muted">${lastLogin}</small></td>
           <td>
-            <button type="button" class="btn btn-sm btn-outline" onclick="showToast('Edit pengguna belum diimplementasikan.', 'info')">Edit</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="openEditUser('${u.user_id}')">Edit</button>
           </td>
         </tr>
       `;
@@ -1167,10 +1707,46 @@
 
   function openUserModal() {
     document.getElementById('userForm').reset();
+    document.getElementById('umUserId').value = '';
+    document.getElementById('userModalTitle').textContent = 'Tambah Pengguna Baru';
+    document.getElementById('umPassword').disabled = false;
+    openModal('userModal');
+  }
+
+  function openEditUser(userId) {
+    const user = (AppState.users || []).find((u) => u.user_id === userId);
+    if (!user) return showToast('Data pengguna tidak ditemukan.', 'error');
+    document.getElementById('umUserId').value = user.user_id;
+    document.getElementById('umEmail').value = user.email || '';
+    document.getElementById('umUsername').value = user.username || '';
+    document.getElementById('umPassword').value = '';
+    document.getElementById('umPassword').disabled = true;
+    document.getElementById('umRole').value = user.role_name || 'REGULAR_USER';
+    document.getElementById('umStatus').value = String(user.is_active !== false);
+    document.getElementById('userModalTitle').textContent = 'Edit Pengguna';
     openModal('userModal');
   }
 
   function submitUser() {
+    const userId = document.getElementById('umUserId').value;
+    if (userId) {
+      showLoading('Memperbarui pengguna...');
+      google.script.run.withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast('Pengguna berhasil diperbarui.', 'success');
+          closeModal('userModal');
+          loadUsers();
+        } else showToast(response && response.error ? response.error.message : 'Gagal memperbarui pengguna.', 'error');
+      }).withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || 'Gagal memperbarui pengguna.', 'error');
+      }).apiUpdateUser(userId, {
+        role: document.getElementById('umRole').value,
+        isActive: document.getElementById('umStatus').value === 'true'
+      });
+      return;
+    }
     const payload = {
       email: document.getElementById('umEmail').value,
       username: document.getElementById('umUsername').value,
@@ -1243,9 +1819,21 @@
   function deleteWbsItem(wbsId) {
     if (!confirm("Hapus item WBS ini?")) return;
     showLoading("Menghapus...");
-    // Belum di-expose di Code.gs secara eksplisit, tapi bisa ditambahkan jika perlu.
-    showToast("Fitur hapus belum terhubung.", "info");
-    hideLoading();
+    google.script.run
+      .withSuccessHandler((response) => {
+        hideLoading();
+        if (response && response.success) {
+          showToast("Item WBS berhasil dihapus.", "success");
+          loadWBSData(document.getElementById('sCurveProjectSelect').value);
+        } else {
+          showToast(response && response.error ? response.error.message : "Gagal menghapus WBS.", "error");
+        }
+      })
+      .withFailureHandler((err) => {
+        hideLoading();
+        showToast(err.message || "Gagal menghapus WBS.", "error");
+      })
+      .apiDeleteWBSItem(wbsId);
   }
 
   // Dipanggil ketika select proyek di Modal Progres diubah

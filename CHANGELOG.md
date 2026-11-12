@@ -6,6 +6,32 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id-
 
 ---
 
+## [Unreleased] - Notification Management Enhancement
+
+### Implementasi Terbaru
+- **Administrative Notifications (NT-006):** Menambahkan sheet `Notification_Admin_Items` untuk pengingat administrasi tanpa `project_id`.
+- **Administrative Lifecycle:** Mendukung status `OPEN`, `IN_PROGRESS`, `COMPLETED`, dan `CANCELLED`; status selesai/batal menghentikan notifikasi.
+- **Administrative Events:** Menambahkan `ADMINISTRATIVE_REMINDER`, `DOCUMENT_EXPIRING`, `APPROVAL_PENDING`, `PAYMENT_DUE`, dan `COMPLIANCE_DEADLINE`.
+- **Administrative UI:** Admin dapat membuat, mengedit, melihat, dan menghapus item administrasi beserta kategori, owner, tenggat, threshold, dan rule.
+- **Safe Schema Migration:** Sheet/kolom baru ditambahkan tanpa menghapus data existing.
+- **Documentation Sync:** `ISSUE_TRACKER.md`, `MANUAL_QA_GUIDE.md`, dan laporan integration/regression diperbarui dengan status QA yang dapat diverifikasi.
+
+### Ditambahkan
+- **Admin Notification Configuration:** UI Admin untuk menyimpan token Fonnte secara aman melalui `PropertiesService`.
+- **Channel Testing:** Pengujian pengiriman email dan WhatsApp langsung dari Web App.
+- **Recipient Groups:** Group penerima dengan email To/CC/BCC dan banyak nomor WhatsApp.
+- **Notification Rules:** Konfigurasi event, frekuensi `EVENT`, `DAILY`, `WEEKLY`, `CUSTOM`, hari, jam, dan timezone.
+- **Custom Templates:** Penyimpanan subject/body template notifikasi dengan placeholder proyek dasar.
+- **Delivery Control:** Deduplikasi berdasarkan event, retry terbatas, dan ledger `Notification_Deliveries` untuk status pengiriman.
+- **Implementation Tracking:** `docs/ISSUE_TRACKER.md` untuk tahapan pekerjaan notifikasi.
+- **Manual QA:** `docs/MANUAL_QA_GUIDE.md` untuk pengujian konfigurasi, pengiriman, scheduler, security, dan UAT.
+
+### Catatan
+- Scheduler production, trigger time-driven, event bisnis tambahan, dan regression/UAT runtime masih perlu divalidasi sebelum release production.
+- Klaim historis `145/145` test case tidak digunakan sebagai hasil verifikasi terbaru; tabel functional test yang ada berjumlah 115 skenario.
+
+---
+
 ## [1.0.1] - 2026-09-03
 
 ### Ditambahkan
@@ -42,4 +68,4 @@ Format berkas ini mengacu pada [Keep a Changelog](https://keepachangelog.com/id-
 - **Multi-Channel Notification:** Otomasi pengiriman email HTML via GmailApp dan pesan WhatsApp via Fonnte API (#13, #14).
 - **Reporting & Google Drive:** Ekspor PDF laporan proyek/portofolio, pengarsipan otomatis Google Drive, dan matriks varians deviasi (#15, #16, #18, #19).
 - **Performance Optimization:** In-memory caching dan benchmarking profiler (#20).
-- **Pengujian Lengkap (QA):** 145/145 unit test otomatis lulus 100%, laporan Functional, Integration, Regression, dan UAT sign-off (#21, #22, #23, #24).
+- **Pengujian Lengkap (QA):** Laporan historis Functional, Integration, Regression, dan UAT tersedia; jumlah tabel functional test yang tercatat adalah 115 skenario (#21, #22, #23, #24).

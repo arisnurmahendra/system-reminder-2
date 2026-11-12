@@ -99,6 +99,7 @@ function processUserLogin(identifier, inputPassword, totpToken) {
 
   return formatSuccessResponse({
     status: "AUTHENTICATED",
+    sessionToken: issueSessionToken_(),
     user: {
       userId: user.userId,
       email: user.email,

@@ -451,6 +451,13 @@
 
         <!-- TAB 5: SETTINGS & CHANNELS -->
         <section class="tab-pane" id="tabSettings">
+          <div class="page-heading" style="margin-bottom:22px;">
+            <div>
+              <h2 class="page-title">Settings &amp; Channels</h2>
+              <p class="page-subtitle">Kelola koneksi, penerima, aturan pengiriman, template, dan audit notifikasi dari satu tempat.</p>
+            </div>
+            <span class="security-badge-header">Admin only · Configuration center</span>
+          </div>
           <div class="settings-grid">
             <!-- WhatsApp Test Card -->
             <div class="card">
@@ -472,6 +479,58 @@
                   <span>Kirim Pesan Uji Coba</span>
                 </button>
               </form>
+            </div>
+
+            <!-- Baseline Info Card -->
+            <div class="card" id="notificationAdminCard">
+              <div class="card-header"><h3 class="card-title">⚙️ Konfigurasi Notifikasi Admin</h3><p class="card-desc">Token disimpan aman di Script Properties. Hanya Administrator yang dapat mengubahnya.</p></div>
+              <form onsubmit="saveNotificationToken(event)">
+                <div class="form-group"><label class="form-label" for="fonnteTokenInput">Token Fonnte API</label><input type="password" id="fonnteTokenInput" class="form-input" autocomplete="off" placeholder="Masukkan token Fonnte"></div>
+                <button type="submit" class="btn btn-primary">Simpan Token</button>
+              </form>
+              <hr style="margin:18px 0;border-color:rgba(255,255,255,.1)">
+              <form onsubmit="handleSendTestEmail(event)">
+                <div class="form-group"><label class="form-label" for="emailTestRecipient">Email Test</label><input type="email" id="emailTestRecipient" class="form-input" required placeholder="admin@contoh.com"></div>
+                <button type="submit" class="btn btn-outline">Kirim Test Email</button>
+              </form>
+            </div>
+            <div class="card" id="recipientRuleCard">
+              <div class="card-header"><h3 class="card-title">👥 Group & Jadwal Notifikasi</h3><p class="card-desc">Gunakan koma, titik koma, atau baris baru untuk banyak penerima.</p></div>
+              <form onsubmit="saveRecipientGroup(event)">
+                <input type="hidden" id="notificationGroupId">
+                <div class="form-group"><label class="form-label">Project ID (opsional)</label><input id="notificationGroupProjectId" class="form-input" placeholder="prj_..."></div>
+                <div class="form-group"><label class="form-label">Nama Group</label><input id="notificationGroupName" class="form-input" required placeholder="Manajemen Proyek"></div>
+                <div class="form-group"><label class="form-label">Role penerima (opsional)</label><input id="notificationGroupRoles" class="form-input" placeholder="PIC, MANAGER"></div>
+                <div class="form-group"><label class="form-label">Email To</label><textarea id="notificationEmailTo" class="form-textarea" placeholder="to@example.com"></textarea></div>
+                <div class="grid-2"><div class="form-group"><label class="form-label">CC</label><textarea id="notificationEmailCc" class="form-textarea"></textarea></div><div class="form-group"><label class="form-label">BCC</label><textarea id="notificationEmailBcc" class="form-textarea"></textarea></div></div>
+                <div class="form-group"><label class="form-label">Nomor WhatsApp</label><textarea id="notificationWhatsAppNumbers" class="form-textarea" placeholder="08123456789"></textarea></div>
+                <button type="submit" class="btn btn-primary">Simpan Group</button>
+              </form>
+              <div id="notificationGroupsList" style="margin-top:18px;"></div>
+              <hr style="margin:18px 0;border-color:rgba(255,255,255,.1)">
+              <form onsubmit="saveNotificationRule(event)">
+                <div class="grid-2"><div class="form-group"><label class="form-label">Project ID (kosong untuk rule administratif)</label><input id="notificationRuleProjectId" class="form-input"></div><div class="form-group"><label class="form-label">Group ID</label><input id="notificationRuleGroupId" class="form-input"></div></div>
+                <div class="grid-2"><div class="form-group"><label class="form-label">Event</label><select id="notificationRuleEvent" class="form-select"><option value="DELAYED">Keterlambatan</option><option value="NO_PROGRESS">Tidak ada progres</option><option value="DEADLINE_APPROACHING">Mendekati deadline</option><option value="DAILY_STATUS">Status Harian</option><option value="WEEKLY_SUMMARY">Ringkasan mingguan</option><option value="COMPLETED">Proyek Selesai</option><option value="DEVIATION_ESCALATION">Eskalasi deviasi</option><option value="PROGRESS_INPUT_REMINDER">Pengingat input progres</option><option value="ADMINISTRATIVE_REMINDER">Pengingat administrasi</option><option value="DOCUMENT_EXPIRING">Dokumen kedaluwarsa</option><option value="APPROVAL_PENDING">Approval tertunda</option><option value="PAYMENT_DUE">Pembayaran jatuh tempo</option><option value="COMPLIANCE_DEADLINE">Tenggat compliance</option></select></div><div class="form-group"><label class="form-label">Frekuensi</label><select id="notificationRuleFrequency" class="form-select"><option>EVENT</option><option selected>DAILY</option><option>WEEKLY</option><option>CUSTOM</option></select></div></div>
+                <div class="grid-2"><div class="form-group"><label class="form-label">Jam</label><input type="time" id="notificationRuleTime" class="form-input" value="08:00"></div><div class="form-group"><label class="form-label">Template ID (opsional)</label><input id="notificationRuleTemplateId" class="form-input"></div></div>
+                <div class="grid-2"><div class="form-group"><label class="form-label">Hari (1-7, pisahkan koma)</label><input id="notificationRuleDays" class="form-input" placeholder="1,2,3,4,5"></div><div class="form-group"><label class="form-label">Dedupe (menit)</label><input type="number" id="notificationRuleDedupe" class="form-input" value="1440" min="1"></div></div>
+                <button type="submit" class="btn btn-outline">Simpan Aturan Jadwal</button>
+              </form>
+              <div style="margin-top:14px;"><button type="button" class="btn btn-outline" onclick="installNotificationScheduler()">Pasang Scheduler Per Jam</button></div>
+              <div id="notificationRulesList" style="margin-top:18px;"></div>
+            </div>
+            <div class="card" id="notificationAdminItemCard">
+              <div class="card-header"><h3 class="card-title">Pengingat Administrasi</h3><p class="card-desc">Notifikasi administrasi yang tidak terkait proyek.</p></div>
+              <form onsubmit="saveNotificationAdminItem(event)"><input type="hidden" id="notificationAdminItemId"><input id="notificationAdminItemTitle" class="form-input" required placeholder="Judul administrasi"><textarea id="notificationAdminItemDescription" class="form-textarea" placeholder="Detail atau tindakan yang diperlukan"></textarea><div class="grid-2"><input id="notificationAdminItemCategory" class="form-input" placeholder="Kategori"><input id="notificationAdminItemOwner" class="form-input" placeholder="PIC/owner"></div><div class="grid-2"><select id="notificationAdminItemStatus" class="form-select"><option>OPEN</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>CANCELLED</option></select><input type="date" id="notificationAdminItemDueDate" class="form-input"></div><div class="grid-2"><input type="number" id="notificationAdminItemThreshold" class="form-input" min="0" value="7" placeholder="Pengingat H-berapa"><input id="notificationAdminItemRuleId" class="form-input" placeholder="Rule ID administratif"></div><button type="submit" class="btn btn-primary">Simpan Pengingat</button></form><div id="notificationAdminItemsList" style="margin-top:18px;"></div>
+            </div>
+            <div class="card" id="notificationTemplateCard">
+              <div class="card-header"><h3 class="card-title">📝 Template Notifikasi</h3></div>
+              <form onsubmit="saveNotificationTemplate(event)"><input type="hidden" id="notificationTemplateId"><div class="grid-2"><div class="form-group"><label class="form-label">Nama Template</label><input id="notificationTemplateName" class="form-input" required></div><div class="form-group"><label class="form-label">Channel</label><select id="notificationTemplateChannel" class="form-select"><option>EMAIL</option><option>WHATSAPP</option></select></div></div><div class="form-group"><label class="form-label">Subject</label><input id="notificationTemplateSubject" class="form-input"></div><div class="form-group"><label class="form-label">Isi Template</label><textarea id="notificationTemplateBody" class="form-textarea" placeholder="Placeholder: {project_name}, {actual_progress}, {planned_progress}, {deviation}, {pic_name}, {days_remaining}"></textarea></div><button type="submit" class="btn btn-outline">Simpan Template</button></form>
+              <div id="notificationTemplatesList" style="margin-top:18px;"></div>
+            </div>
+            <div class="card" id="notificationDeliveryCard">
+              <div class="card-header"><h3 class="card-title">📬 Delivery Audit</h3><p class="card-desc">Status pengiriman per penerima, termasuk retry dan skip karena deduplikasi.</p></div>
+              <button type="button" class="btn btn-outline" onclick="loadNotificationDeliveries()">Muat Delivery Status</button>
+              <div id="notificationDeliveriesList" style="margin-top:14px;"></div>
             </div>
 
             <!-- Baseline Info Card -->
@@ -586,6 +645,7 @@
       </div>
       <div class="modal-body">
         <form id="userForm" onsubmit="event.preventDefault(); submitUser();">
+          <input type="hidden" id="umUserId">
           <div class="form-group">
             <label class="form-label" for="umEmail">Email Google Workspace</label>
             <input type="email" id="umEmail" class="form-input" required>
@@ -608,6 +668,13 @@
               <option value="ADMINISTRATOR">Administrator</option>
             </select>
           </div>
+          <div class="form-group">
+            <label class="form-label" for="umStatus">Status</label>
+            <select id="umStatus" class="form-select">
+              <option value="true">Aktif</option>
+              <option value="false">Nonaktif</option>
+            </select>
+          </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="closeModal('userModal')">Batal</button>
             <button type="submit" class="btn btn-primary">Simpan Pengguna</button>
@@ -621,11 +688,12 @@
   <div class="modal-backdrop hidden" id="createProjectModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">Registrasi Proyek Baru</h3>
+        <h3 class="modal-title" id="projectModalTitle">Registrasi Proyek Baru</h3>
         <button type="button" class="btn-close" onclick="closeModal('createProjectModal')">×</button>
       </div>
 
       <form id="createProjectForm" onsubmit="handleCreateProject(event)">
+        <input type="hidden" id="projectEditId">
         <div class="form-group">
           <label class="form-label" for="pName">Nama Proyek *</label>
           <input type="text" id="pName" class="form-input" placeholder="Contoh: Proyek Gedung Menara 2" required>
@@ -665,7 +733,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" onclick="closeModal('createProjectModal')">Batal</button>
-          <button type="submit" class="btn btn-primary">Simpan Proyek</button>
+          <button type="submit" class="btn btn-primary"><span id="projectSubmitLabel">Simpan Proyek</span></button>
         </div>
       </form>
     </div>
@@ -680,6 +748,7 @@
       </div>
 
       <form id="recordProgressForm" onsubmit="handleRecordProgress(event)">
+        <input type="hidden" id="progressEditId">
         <div class="form-group">
           <label class="form-label" for="progModalProject">Pilih Proyek *</label>
           <select id="progModalProject" class="form-select" onchange="populateProgressWbsDropdown(this.value)" required>

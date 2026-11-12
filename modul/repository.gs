@@ -122,6 +122,20 @@ var SpreadsheetManager = {
     schema[CONFIG.SPREADSHEET.SHEETS.PROJECT_WBS] = [
       "wbs_id", "project_id", "task_name", "weight", "start_date", "end_date", "actual_progress", "created_at"
     ];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_GROUPS] = [
+      "group_id", "project_id", "group_name", "email_to", "email_cc", "email_bcc", "whatsapp_numbers", "recipient_roles", "is_active", "created_at", "updated_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_RULES] = [
+      "rule_id", "project_id", "group_id", "template_id", "event_type", "frequency", "days_of_week", "send_time", "timezone", "threshold_value", "is_active", "dedupe_minutes", "max_retries", "created_at", "updated_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_TEMPLATES] = [
+      "template_id", "template_name", "channel", "subject", "body", "template_version", "version_history", "is_active", "created_at", "updated_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_DELIVERIES] = [
+      "delivery_id", "dedupe_key", "project_id", "rule_id", "channel", "recipient", "status", "attempts", "last_error", "provider_id", "payload", "sent_at", "created_at"
+    ];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_HOLIDAYS] = ["holiday_id", "holiday_date", "holiday_name", "is_active", "created_at"];
+    schema[CONFIG.SPREADSHEET.SHEETS.NOTIFICATION_ADMIN_ITEMS] = ["item_id", "title", "description", "category", "status", "due_date", "threshold_days", "owner", "rule_id", "last_notified_at", "is_active", "created_at", "updated_at"];
     return schema;
   },
 
@@ -158,6 +172,12 @@ var SpreadsheetManager = {
             sheet.appendRow(defaultHeaders);
             report.headerAddedSheets.push(sheetName);
           } else {
+            var existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0].map(String);
+            var missingHeaders = defaultHeaders.filter(function(header) { return existingHeaders.indexOf(header) < 0; });
+            if (missingHeaders.length) {
+              sheet.getRange(1, sheet.getLastColumn() + 1, 1, missingHeaders.length).setValues([missingHeaders]);
+              report.headerAddedSheets.push(sheetName + " (kolom tambahan: " + missingHeaders.join(", ") + ")");
+            }
             report.existingSheets.push(sheetName);
           }
         }

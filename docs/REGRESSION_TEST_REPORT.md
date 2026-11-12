@@ -5,7 +5,8 @@
 - **Versi:** 1.0.0-RC
 - **Tanggal Eksekusi:** 27 Agustus 2026
 - **Tujuan:** Verifikasi stabilitas menyeluruh paska refactoring dan optimasi performa caching
-- **Status Akhir:** ✅ **100% LULUS (145/145 Test Case)**
+- **Status Baseline Historis:** ✅ **145/145 test case tercatat pada laporan lama**
+- **Status NT-006:** `PENDING` — menunggu regression staging
 
 ---
 
@@ -47,4 +48,17 @@
 ---
 
 ## 🏆 Kesimpulan
+
+## Addendum NT-006 — Regression Scope
+
+Perubahan NT-006 menambah jalur notifikasi administrasi dan schema
+`Notification_Admin_Items`. Pemeriksaan lokal memvalidasi sintaks source dan
+kesesuaian schema secara statis. Pengujian runtime berikut belum dijalankan:
+
+- scheduler administratif;
+- pengiriman email dan WhatsApp;
+- deduplikasi/retry administratif;
+- penghentian setelah status `COMPLETED` atau `CANCELLED`.
+
+Status regression NT-006: `PENDING` sampai QA-17 dan regression staging selesai.
 Tidak ditemukan satupun regresi atau efek samping negatif pada seluruh modul sistem. Sistem berstatus **STABLE** dan siap untuk tahap User Acceptance Testing (UAT).

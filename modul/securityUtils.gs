@@ -134,6 +134,43 @@ function validateRequired(value, fieldName) {
   }
 }
 
+function validateFiniteRange_(value, fieldName, minimum, maximum) {
+  var number = Number(value);
+  if (!isFinite(number)) throw ErrorFactory.validation((fieldName || "Nilai") + " harus berupa angka finite.");
+  if (number < minimum || number > maximum) throw ErrorFactory.validation((fieldName || "Nilai") + " harus berada di antara " + minimum + " dan " + maximum + ".");
+  return number;
+}
+
+function validateMaxLength_(value, fieldName, maximum) {
+  var text = value === null || value === undefined ? "" : String(value);
+  if (text.length > maximum) throw ErrorFactory.validation((fieldName || "Input") + " maksimal " + maximum + " karakter.");
+  return text;
+}
+
+function enforceRateLimit_(action, identifier, limit, windowSeconds) {
+  var cache = CacheService.getScriptCache();
+  var safeId = String(identifier || getCurrentUserEmail_() || "anonymous").toLowerCase().replace(/[^a-z0-9_.@-]/g, "_");
+  var key = "RATE:" + String(action || "request") + ":" + safeId;
+  var current = Number(cache.get(key) || 0) + 1;
+  if (current > limit) throw ErrorFactory.validation("Terlalu banyak percobaan. Silakan tunggu sebelum mencoba lagi.");
+  cache.put(key, String(current), windowSeconds);
+  return true;
+}
+
+function issueSessionToken_() {
+  var token = Utilities.getUuid() + Utilities.getUuid();
+  PropertiesService.getUserProperties().setProperties({ SESSION_TOKEN: token, SESSION_TOKEN_EXPIRES: String(Date.now() + 3600000) }, true);
+  return token;
+}
+
+function enforceSessionToken_(token) {
+  var props = PropertiesService.getUserProperties();
+  var expected = props.getProperty("SESSION_TOKEN");
+  var expires = Number(props.getProperty("SESSION_TOKEN_EXPIRES") || 0);
+  if (!token || !expected || token !== expected || Date.now() > expires) throw new Error("Sesi aplikasi tidak valid atau sudah kedaluwarsa.");
+  return true;
+}
+
 // ==========================================
 // 3. AUTHORIZATION & RBAC ENFORCEMENT
 // ==========================================

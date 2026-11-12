@@ -52,6 +52,7 @@ function apiInitializeDatabase() {
 
 function apiLogin(identifier, password, totpToken) {
   return safeWebResponse(function() {
+    enforceRateLimit_("LOGIN", identifier, 5, 900);
     var cleanIdentifier = sanitizeString(identifier);
     var cleanPassword = String(password || "");
     var cleanTotp = sanitizeString(totpToken);
@@ -72,6 +73,10 @@ function apiCheckSession() {
   return safeWebResponse(function() {
     return getActiveSessionStatus();
   }, "apiCheckSession");
+}
+
+function apiValidateSessionToken(token) {
+  return safeWebResponse(function() { enforceSessionToken_(sanitizeString(token)); return formatSuccessResponse({ valid: true }); }, "apiValidateSessionToken");
 }
 
 function apiLogout() {
@@ -195,28 +200,6 @@ function apiGetLatestProgress(projectId) {
   }, "apiGetLatestProgress");
 }
 
-function apiGetProjectCurveData(projectId, curveType) {
-  return safeWebResponse(function() {
-    var cleanId = sanitizeString(projectId);
-    var project = ProjectRepository.findById(cleanId);
-    if (!project) {
-      throw ErrorFactory.notFound("Proyek", cleanId);
-    }
-
-    var plannedCurve = ProgressEngine.generatePlannedCurve(project.start_date, project.end_date, 20, curveType || "SCURVE");
-    var actualLogs = ProgressLogRepository.findByProject(cleanId);
-    actualLogs.sort(function(a, b) {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
-
-    return {
-      project: project,
-      plannedCurve: plannedCurve,
-      actualLogs: actualLogs
-    };
-  }, "apiGetProjectCurveData");
-}
-
 function apiGetProjectTimeline(projectId, options) {
   return safeWebResponse(function() {
     var cleanId = sanitizeString(projectId);
@@ -260,6 +243,12 @@ function apiSaveWBSItem(payload) {
   return safeWebResponse(function() {
     return WBSService.saveWBSItem(payload);
   }, "apiSaveWBSItem");
+}
+
+function apiDeleteWBSItem(wbsId) {
+  return safeWebResponse(function() {
+    return WBSService.deleteWBSItem(sanitizeString(wbsId));
+  }, "apiDeleteWBSItem");
 }
 
 function apiGetAllUsers() {
@@ -358,6 +347,7 @@ function apiTriggerDailyReminders() {
 
 function apiSendTestWhatsApp(targetPhone) {
   return safeWebResponse(function() {
+    enforceAdminRole_(); enforceRateLimit_("TEST_WHATSAPP", targetPhone, 3, 300);
     var cleanPhone = sanitizeString(targetPhone);
     var sent = FonnteHelper.sendTestMessage(cleanPhone);
     return {
@@ -369,6 +359,7 @@ function apiSendTestWhatsApp(targetPhone) {
 
 function apiSendTestEmail(recipientEmail) {
   return safeWebResponse(function() {
+    enforceAdminRole_(); enforceRateLimit_("TEST_EMAIL", recipientEmail, 3, 300);
     var cleanEmail = sanitizeString(recipientEmail);
     var sent = EmailHelper.sendTestEmail(cleanEmail);
     return {
@@ -376,6 +367,78 @@ function apiSendTestEmail(recipientEmail) {
       sent: sent
     };
   }, "apiSendTestEmail");
+}
+
+function apiSetFonnteToken(token) {
+  return safeWebResponse(function() {
+    enforceAdminRole_();
+    if (!token || String(token).trim().length < 8) throw ErrorFactory.validation("Token Fonnte tidak valid.");
+    PropertiesService.getScriptProperties().setProperty("FONNTE_TOKEN", String(token).trim());
+    AppLogger.audit("NotificationConfig", "FONNTE_TOKEN_UPDATED", "SUCCESS", {});
+    return formatSuccessResponse({}, "Token Fonnte berhasil disimpan.");
+  }, "apiSetFonnteToken");
+}
+
+function apiSaveNotificationGroup(payload) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.saveGroup(payload || {}); }, "apiSaveNotificationGroup");
+}
+
+function apiDeleteNotificationGroup(groupId) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.deleteGroup(sanitizeString(groupId)); }, "apiDeleteNotificationGroup");
+}
+
+function apiGetNotificationAdminItems() { return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.getAdminItems(); }, "apiGetNotificationAdminItems"); }
+function apiSaveNotificationAdminItem(payload) { return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.saveAdminItem(payload || {}); }, "apiSaveNotificationAdminItem"); }
+function apiDeleteNotificationAdminItem(itemId) { return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.deleteAdminItem(sanitizeString(itemId)); }, "apiDeleteNotificationAdminItem"); }
+
+function apiSaveNotificationRule(payload) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.saveRule(payload || {}); }, "apiSaveNotificationRule");
+}
+
+function apiDeleteNotificationRule(ruleId) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.deleteRule(sanitizeString(ruleId)); }, "apiDeleteNotificationRule");
+}
+
+function apiInstallNotificationScheduler() {
+  return safeWebResponse(function() {
+    enforceAdminRole_();
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(trigger) {
+      if (["scheduledDailyJob", "scheduledNotificationRetryJob"].indexOf(trigger.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(trigger);
+    });
+    var trigger = ScriptApp.newTrigger("scheduledDailyJob").timeBased().everyHours(1).create();
+    var retryTrigger = ScriptApp.newTrigger("scheduledNotificationRetryJob").timeBased().everyHours(1).create();
+    AppLogger.audit("NotificationConfig", "SCHEDULER_INSTALLED", "SUCCESS", { triggerId: trigger.getUniqueId(), retryTriggerId: retryTrigger.getUniqueId(), cadence: "HOURLY" });
+    return formatSuccessResponse({ triggerId: trigger.getUniqueId(), retryTriggerId: retryTrigger.getUniqueId(), cadence: "HOURLY" }, "Scheduler sweep dan retry notifikasi berhasil dipasang setiap jam.");
+  }, "apiInstallNotificationScheduler");
+}
+
+function apiSaveNotificationTemplate(payload) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.saveTemplate(payload || {}); }, "apiSaveNotificationTemplate");
+}
+
+function apiDeleteNotificationTemplate(templateId) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.deleteTemplate(sanitizeString(templateId)); }, "apiDeleteNotificationTemplate");
+}
+
+function apiRollbackNotificationTemplate(templateId, version) {
+  return safeWebResponse(function() { enforceAdminRole_(); if (Array.isArray(templateId)) { version = templateId[1]; templateId = templateId[0]; } return NotificationConfigService.rollbackTemplate(sanitizeString(templateId), Number(version)); }, "apiRollbackNotificationTemplate");
+}
+
+function apiPreviewNotificationTemplate(payload) {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.previewTemplate(payload || {}); }, "apiPreviewNotificationTemplate");
+}
+
+function apiGetNotificationConfig() {
+  return safeWebResponse(function() { enforceAdminRole_(); return NotificationConfigService.getConfig(); }, "apiGetNotificationConfig");
+}
+
+function apiGetNotificationDeliveries(filters) {
+  return safeWebResponse(function() { enforceRoles_([CONFIG.ROLES.ADMINISTRATOR, CONFIG.ROLES.AUDITOR]); return NotificationConfigService.getDeliveries(filters || {}); }, "apiGetNotificationDeliveries");
+}
+
+function apiRetryNotificationDelivery(deliveryId) {
+  return safeWebResponse(function() { enforceAdminRole_(); enforceRateLimit_("RETRY_DELIVERY", deliveryId, 10, 300); return NotificationConfigService.retryDelivery(sanitizeString(deliveryId)); }, "apiRetryNotificationDelivery");
 }
 
 /**
@@ -387,4 +450,9 @@ function scheduledDailyJob() {
   } catch (e) {
     AppLogger.error("Code.gs", "Kesalahan eksekusi scheduledDailyJob: " + e.message, e);
   }
+}
+
+function scheduledNotificationRetryJob() {
+  try { NotificationConfigService.retryFailedDeliveries(20); }
+  catch (e) { AppLogger.error("Code.gs", "Kesalahan retry delivery: " + e.message, e); }
 }

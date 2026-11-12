@@ -44,6 +44,12 @@ var CONFIG = {
       PROJECTS: "Projects",
       PROGRESS_LOGS: "Progress_Logs",
       PROJECT_WBS: "Project_WBS"
+      ,NOTIFICATION_GROUPS: "Notification_Groups"
+      ,NOTIFICATION_RULES: "Notification_Rules"
+      ,NOTIFICATION_TEMPLATES: "Notification_Templates"
+      ,NOTIFICATION_DELIVERIES: "Notification_Deliveries"
+      ,NOTIFICATION_HOLIDAYS: "Notification_Holidays"
+      ,NOTIFICATION_ADMIN_ITEMS: "Notification_Admin_Items"
     }
   },
 

@@ -5,7 +5,8 @@
 - **Versi:** 1.0.0-RC
 - **Tanggal Eksekusi:** 27 Agustus 2026
 - **Standar Arsitektur:** 3-Tier Layered Architecture (Presentation → Service → Repository → Storage)
-- **Status Akhir:** ✅ **100% LULUS (Semua Integrasi Terverifikasi)**
+- **Status Baseline Historis:** ✅ **Semua integrasi baseline terverifikasi**
+- **Status NT-006:** `PENDING` — menunggu QA-17/staging
 
 ---
 
@@ -42,4 +43,17 @@
 ---
 
 ## 🏆 Kesimpulan
+
+## Addendum NT-006 — Administrative Notification Integration
+
+| Skenario | Status | Catatan |
+|---|---|---|
+| Rule administratif tanpa `project_id` | NOT RUN | Membutuhkan eksekusi pada Apps Script staging |
+| `Notification_Admin_Items` ke scheduler | NOT RUN | Belum ada trigger staging yang dijalankan |
+| Email/WhatsApp administratif | NOT RUN | Credential dan recipient nyata tidak digunakan pada pemeriksaan lokal |
+| Lifecycle `COMPLETED`/`CANCELLED` | STATIC PASS | Kondisi stop tersedia pada source code |
+| Delivery audit dan deduplikasi | STATIC PASS | Jalur service terhubung ke ledger delivery |
+
+Addendum ini bukan pengganti integration test staging. Status keseluruhan
+integration NT-006 tetap `PENDING` sampai QA-17 dijalankan.
 Seluruh komunikasi antar lapisan dan integrasi layanan eksternal berjalan dengan sempurna sesuai prinsip `docs/ARCHITECTURE_PRINCIPLES.md` dan `docs/DEPENDENCY_RULES.md`.

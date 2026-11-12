@@ -78,10 +78,18 @@ var UserService = {
     var existing = UserRepository.findById(userId);
     if (!existing) throw ErrorFactory.notFound("Pengguna", userId);
 
+    payload = payload || {};
     var updates = {};
-    if (payload.role) updates.role_name = payload.role;
+    if (payload.role) {
+      if (Object.keys(CONFIG.ROLES).indexOf(payload.role) === -1) {
+        throw ErrorFactory.validation("Role pengguna tidak valid.");
+      }
+      updates.role_name = payload.role;
+    }
     if (payload.isActive !== undefined) updates.is_active = payload.isActive;
-    // Opsi reset password oleh admin bisa ditambahkan di sini nantinya
+    if (Object.keys(updates).length === 0) {
+      throw ErrorFactory.validation("Tidak ada perubahan pengguna yang dikirim.");
+    }
 
     UserRepository.update(userId, updates);
 

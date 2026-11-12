@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System Reminder 2 — Local Preview</title>
+  <style>body{font-family:Arial,sans-serif;background:#0a0f1d;color:#e2e8f0;padding:24px}#previewStatus{max-width:720px;margin:auto;padding:16px;border:1px solid #334155;border-radius:10px}#previewStatus small{color:#94a3b8}</style>
+</head>
+<body>
+  <div id="previewStatus">Memuat preview lokal...<br><small>Mode ini hanya untuk tampilan frontend; tidak terhubung ke Spreadsheet, Gmail, Fonnte, atau GAS.</small></div>
+  <script>
+    (async function () {
+      try {
+        const files = await Promise.all([
+          fetch('Index.html').then(r => r.text()),
+          fetch('style.html').then(r => r.text()),
+          fetch('script.html').then(r => r.text())
+        ]);
+        const html = files[0]
+          .replace("<?!= include('style'); ?>", files[1])
+          .replace("<?!= include('script'); ?>", files[2]);
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (error) {
+        document.getElementById('previewStatus').innerHTML = 'Preview gagal dimuat.<br><small>' + error.message + '<br>Jalankan melalui HTTP server lokal, bukan file://.</small>';
+      }
+    }());
+  </script>
+</body>
+</html>

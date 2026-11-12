@@ -97,21 +97,26 @@ var FonnteHelper = {
    * @returns {boolean}
    */
   sendMessage: function(targetPhone, messageText) {
+    return this.sendMessageDetailed(targetPhone, messageText).sent;
+  },
+
+  sendMessageDetailed: function(targetPhone, messageText) {
+    var correlationId = "fonnte_" + Utilities.getUuid();
     var token = CONFIG.FONNTE.API_TOKEN;
     if (!token) {
       AppLogger.warn("FonnteHelper", "Token FONNTE_TOKEN belum dikonfigurasi di Script Properties.");
-      return false;
+      return { sent: false, providerId: correlationId, error: "Token Fonnte belum dikonfigurasi" };
     }
 
     if (!targetPhone || !messageText) {
       AppLogger.warn("FonnteHelper", "Nomor target atau isi pesan kosong.");
-      return false;
+      return { sent: false, providerId: correlationId, error: "Nomor target atau isi pesan kosong" };
     }
 
     var cleanPhone = this.sanitizePhoneNumber(targetPhone);
     if (!this.isValidPhoneNumber(cleanPhone)) {
       AppLogger.warn("FonnteHelper", "Nomor target tidak valid: " + targetPhone);
-      return false;
+      return { sent: false, providerId: correlationId, error: "Nomor target tidak valid" };
     }
 
     try {
@@ -134,20 +139,22 @@ var FonnteHelper = {
         var resCode = response.getResponseCode();
         var resText = response.getContentText();
 
+        var providerId = correlationId;
+        try { var parsed = JSON.parse(resText || "{}"); providerId = parsed.id || parsed.message_id || parsed.requestid || (parsed.data && parsed.data.id) || correlationId; } catch (ignore) {}
         if (resCode >= 200 && resCode < 300) {
           AppLogger.audit("FonnteHelper", "WA_SENT", "SUCCESS", { target: cleanPhone });
-          return true;
+          return { sent: true, providerId: String(providerId), error: "" };
         } else {
           AppLogger.error("FonnteHelper", "Gagal kirim WA (HTTP " + resCode + ")", { response: resText });
-          return false;
+          return { sent: false, providerId: String(providerId), error: "HTTP " + resCode + ": " + resText };
         }
       } else {
         AppLogger.audit("FonnteHelper", "WA_SENT_MOCK", "SUCCESS", { target: cleanPhone });
-        return true;
+        return { sent: true, providerId: correlationId, error: "" };
       }
     } catch (err) {
       AppLogger.error("FonnteHelper", "Gagal mengirim pesan WA: " + err.message, err);
-      return false;
+      return { sent: false, providerId: correlationId, error: err.message };
     }
   },
 

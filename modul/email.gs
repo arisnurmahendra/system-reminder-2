@@ -132,10 +132,15 @@ var EmailHelper = {
    * @param {string} [plainText]
    * @returns {boolean}
    */
-  sendEmail: function(recipientEmail, subject, htmlBody, plainText) {
+  sendEmail: function(recipientEmail, subject, htmlBody, plainText, cc, bcc) {
+    return this.sendEmailDetailed(recipientEmail, subject, htmlBody, plainText, cc, bcc).sent;
+  },
+
+  sendEmailDetailed: function(recipientEmail, subject, htmlBody, plainText, cc, bcc) {
+    var correlationId = "gmail_" + Utilities.getUuid();
     if (!recipientEmail || !isValidEmail(recipientEmail)) {
       AppLogger.warn("EmailHelper", "Email penerima tidak valid: " + recipientEmail);
-      return false;
+      return { sent: false, providerId: correlationId, error: "Email penerima tidak valid" };
     }
 
     try {
@@ -143,6 +148,8 @@ var EmailHelper = {
         name: CONFIG.EMAIL.SENDER_NAME || "System Reminder 2",
         htmlBody: htmlBody
       };
+      if (cc) options.cc = cc;
+      if (bcc) options.bcc = bcc;
 
       var textBody = plainText || htmlBody.replace(/<[^>]*>?/gm, '');
 
@@ -155,10 +162,10 @@ var EmailHelper = {
       }
 
       AppLogger.audit("EmailHelper", "EMAIL_SENT", "SUCCESS", { to: recipientEmail, subject: subject }, null, recipientEmail);
-      return true;
+      return { sent: true, providerId: correlationId, error: "" };
     } catch (err) {
       AppLogger.error("EmailHelper", "Gagal mengirim email: " + err.message, err);
-      return false;
+      return { sent: false, providerId: correlationId, error: err.message };
     }
   },
 

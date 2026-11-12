@@ -2,7 +2,7 @@
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Version](https://img.shields.io/badge/version-v1.0.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Tests](https://img.shields.io/badge/tests-145%2F145%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-115%2F115%20historical-brightgreen)
 
 # System Reminder 2
 > Peningkatan dari *System Reminder — Automated Project To-Do Email* (versi 2022)  
@@ -54,6 +54,11 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan dengan arsitektur 
 - 📈 **Schedule & S-Curve Engine:** Perhitungan hari kerja (*working days*), evaluasi keterlambatan, dan aproksimasi Kurva S kumulatif.
 - 📧 **Reminder Email Otomatis:** Template email HTML responsif terkirim otomatis saat deviasi keterlambatan terdeteksi atau proyek tuntas.
 - 💬 **Integrasi WhatsApp:** Notifikasi instan via Fonnte API dengan sanitasi nomor telepon `628xxx`.
+- ⚙️ **Notification Administration:** Konfigurasi token Fonnte, test email/WhatsApp, rule pengiriman, dan timezone melalui UI Admin.
+- 👥 **Recipient Groups:** Penerima email To/CC/BCC dan group nomor WhatsApp yang dapat digunakan ulang.
+- 🗓️ **Flexible Notification Schedule:** Dukungan rule `EVENT`, `DAILY`, `WEEKLY`, dan `CUSTOM` dengan deduplikasi pengiriman.
+- 📝 **Custom Notification Templates:** Subject dan body template notifikasi yang dapat disesuaikan.
+- 🔁 **Delivery Control:** Retry terbatas, pencegahan pesan ganda, dan pencatatan status delivery per penerima.
 - 📊 **Dashboard Analytics:** Ringkasan eksekutif, sebaran kuartil progres, status kesehatan jadwal, dan kalkulator estimasi waktu rampung (*velocity*).
 - 📜 **Notification History:** Pelacakan jejak audit pengiriman multi-kanal dan rasio keberhasilan pengiriman (*success rate*).
 - 📑 **Advanced Report & Export PDF:** Pembuatan dokumen laporan PDF individual/portofolio dan pengarsipan terisolasi di Google Drive.
@@ -74,9 +79,32 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan dengan arsitektur 
 6. (Opsi) Jika Anda ingin menguji sistem dengan data contoh, klik: **🚀 System Reminder > ⚙️ Pengujian & Dev > 🎲 Generate Data Dummy**.
 7. Deploy sebagai **Web App** (Execute as: *User accessing the web app* / *Me*, Who has access: *Anyone with Google account*), lalu buka URL Web App tersebut.
 
+Jalankan:
+python -m http.server 8080
+Buka:
+http://localhost:8080/local-preview.html
+
+
+### Konfigurasi Notifikasi Admin
+
+Setelah login sebagai `ADMINISTRATOR`, buka tab **Settings** pada Web App untuk:
+
+- menyimpan Token Fonnte secara aman;
+- mengirim test email dan WhatsApp;
+- membuat group penerima email To/CC/BCC dan WhatsApp;
+- menyimpan rule event dan jadwal pengiriman;
+- membuat template notifikasi custom.
+
+Token Fonnte tidak ditampilkan kembali setelah disimpan. Gunakan staging recipient
+terlebih dahulu sebelum mengaktifkan pengiriman ke penerima resmi.
+
+Panduan implementasi tersedia di [docs/ISSUE_TRACKER.md](docs/ISSUE_TRACKER.md),
+sedangkan langkah verifikasi manual tersedia di
+[docs/MANUAL_QA_GUIDE.md](docs/MANUAL_QA_GUIDE.md).
+
 ---
 
-## 🗺️ Roadmap v1.0.0 (Selesai 100%)
+## 🗺️ Roadmap v1.0.1 (Implementasi dan QA bertahap)
 
 ### Milestone v0.1: Foundation
 - [x] Security Baseline Control (POL.ISMS.001) (#2)
@@ -116,6 +144,19 @@ Melanjutkan kesuksesan versi pertama, sistem ini ditingkatkan dengan arsitektur 
 
 ---
 
+## 🔔 Notifikasi Administrasi dan Event Bisnis
+
+Selain notifikasi proyek, aplikasi mendukung item administrasi yang tidak
+memerlukan `project_id` melalui sheet `Notification_Admin_Items`. Admin dapat
+mengelola judul, deskripsi, kategori, owner, status, tenggat, threshold, rule,
+recipient group, template, deduplikasi, retry, dan delivery audit.
+
+Event administratif yang tersedia meliputi `ADMINISTRATIVE_REMINDER`,
+`DOCUMENT_EXPIRING`, `APPROVAL_PENDING`, `PAYMENT_DUE`, dan
+`COMPLIANCE_DEADLINE`. Status `COMPLETED` atau `CANCELLED` menghentikan
+notifikasi item tersebut. Runtime staging tetap harus diverifikasi melalui
+`QA-17`.
+
 ## 🛠️ Tumpukan Teknologi
 | Komponen | Alat / Layanan |
 |---|---|
@@ -136,6 +177,8 @@ System-Reminder-2/
 ├── docs/
 │   ├── AI_ROLE.md                  # Peran AI sebagai mitra pengembang proyek
 │   ├── AI_WORKFLOW.md              # Alur kerja dan aturan pengembangan
+│   ├── ISSUE_TRACKER.md            # Tahapan implementasi sistem notifikasi
+│   ├── MANUAL_QA_GUIDE.md          # Manual QA end-to-end aplikasi
 │   ├── ARCHITECTURE_PRINCIPLES.md  # Prinsip arsitektur 3-Tier Layered
 │   ├── DEFINITION_OF_DONE.md       # Kriteria kelayakan penyelesaian tugas (DoD)
 │   ├── DEPENDENCY_RULES.md         # Aturan dan panduan pengelolaan dependensi
@@ -162,6 +205,7 @@ System-Reminder-2/
 │   ├── fonnte.gs                   # Modul pengiriman notifikasi WhatsApp via Fonnte API
 │   ├── hitung-progres.gs           # Logika kalkulasi progres, Kurva S, & deviasi
 │   ├── notificationHistoryService.gs # Audit jejak pengiriman notifikasi
+│   ├── notificationConfigService.gs # Group, rule, template, deduplikasi, delivery
 │   ├── notificationService.gs      # Layanan orkestrator notifikasi multi-kanal
 │   ├── pdfExportService.gs         # Generator dokumen HTML & PDF laporan proyek
 │   ├── performanceBenchmark.gs     # Profiler & benchmark kecepatan eksekusi
@@ -170,7 +214,7 @@ System-Reminder-2/
 │   ├── repository.gs               # Abstraksi akses data, batch read & entity cache
 │   ├── scheduleEngine.gs           # Komputasi hari kerja & fase linimasa jadwal
 │   ├── securityUtils.gs            # Validasi input, sanitasi, rahasia & otorisasi RBAC
-│   └── testSuite.gs                # 145/145 Automated Test Suite
+│   └── testSuite.gs                # Automated Test Suite (lihat laporan QA)
 ├── Code.gs                         # Entry point utama Web App & routing Google Apps Script
 ├── Index.html                      # Halaman utama aplikasi (HTML UI Glassmorphism)
 ├── script.html                     # Parsial JavaScript untuk antarmuka web

@@ -115,8 +115,14 @@ var WBSService = {
 
   deleteWBSItem: function(wbsId) {
     if (!wbsId) throw ErrorFactory.validation("WBS ID diperlukan.");
-    WBSRepository.delete(wbsId);
-    return formatSuccessResponse(null, "Item WBS berhasil dihapus.");
+    var existing = WBSRepository.findById(wbsId);
+    if (!existing) throw ErrorFactory.notFound("Item WBS", wbsId);
+    var deleted = WBSRepository.delete(wbsId);
+    AppLogger.audit("WBSService", "WBS_ITEM_DELETED", "SUCCESS", {
+      wbsId: wbsId,
+      projectId: existing.project_id
+    });
+    return formatSuccessResponse({ deleted: deleted, wbsId: wbsId }, "Item WBS berhasil dihapus.");
   },
 
   // --- Helper Functions ---
